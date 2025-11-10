@@ -5,6 +5,8 @@ import App from './App'
 import LoginPage from './pages/LoginPage'
 import Dashboard from './pages/Dashboard'
 import UploadPage from './pages/UploadPage'
+import SignupPage from './pages/SignupPage'
+import AdminUsers from './pages/AdminUsers'
 import Navbar from './components/Navbar'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminRoute from './components/AdminRoute'
@@ -19,8 +21,10 @@ createRoot(document.getElementById('root')).render(
         <Routes>
           <Route path='/' element={<Navigate to="/dashboard" replace />} />
           <Route path='/login' element={<LoginPage />} />
+          <Route path='/signup' element={<SignupPage />} />
           <Route path='/dashboard' element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path='/upload' element={<AdminRoute><UploadPage /></AdminRoute>} />
+          <Route path='/admin/users' element={<AdminRoute><AdminUsers /></AdminRoute>} />
         </Routes>
       </div>
     </BrowserRouter>

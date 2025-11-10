@@ -27,13 +27,17 @@ export default function Navbar() {
       <div className="flex items-center gap-4">
         <Link className="text-sm text-gray-700" to="/dashboard">Dashboard</Link>
         {user?.role === 'admin' && <Link className="text-sm text-gray-700" to="/upload">Upload</Link>}
+        {user?.role === 'admin' && <Link className="text-sm text-gray-700" to="/admin/users">Manage Users</Link>}
         {user ? (
           <>
             <span className="text-sm text-gray-600">{user.name}</span>
             <button className="px-3 py-1 bg-red-50 text-red-600 rounded" onClick={logout}>Logout</button>
           </>
         ) : (
-          <Link className="text-sm text-blue-600" to="/login">Login</Link>
+          <>
+            <Link className="text-sm text-gray-700" to="/signup">Sign up</Link>
+            <Link className="text-sm text-blue-600" to="/login">Login</Link>
+          </>
         )}
       </div>
     </div>
