@@ -1,8 +1,8 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
-const aws = require('aws-sdk');
-const multerS3 = require('multer-s3');
+const { S3Client } = require('@aws-sdk/client-s3');
+const { Upload } = require('@aws-sdk/lib-storage');
 
 const router = express.Router();
 const Report = require('../models/Report');
@@ -12,29 +12,23 @@ const { verifyToken, requireRole } = require('../middleware/authMiddleware');
 
 // Configure storage: prefer S3 when env vars are present, otherwise local disk
 let upload;
-if (process.env.AWS_S3_BUCKET && process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
-  aws.config.update({
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    region: process.env.AWS_REGION || 'us-east-1'
-  });
-  const s3 = new aws.S3();
-
-  const s3Storage = multerS3({
-    s3: s3,
-    bucket: process.env.AWS_S3_BUCKET,
-    acl: 'private',
-    metadata: function (req, file, cb) {
-      cb(null, { fieldName: file.fieldname });
-    },
-    key: function (req, file, cb) {
-      const unique = Date.now() + '-' + Math.round(Math.random() * 1e9) + '-' + file.originalname;
-      cb(null, unique);
+let s3Client = null;
+let useS3 = false;
+const awsBucket = process.env.AWS_S3_BUCKET;
+const awsRegion = process.env.AWS_REGION || 'us-east-1';
+if (awsBucket && process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
+  useS3 = true;
+  s3Client = new S3Client({
+    region: awsRegion,
+    credentials: {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
     }
   });
 
+  // use memory storage and upload manually with AWS SDK v3
   upload = multer({
-    storage: s3Storage,
+    storage: multer.memoryStorage(),
     fileFilter: function (req, file, cb) {
       if (file.mimetype !== 'application/pdf') cb(new Error('Only PDF files are allowed'));
       else cb(null, true);
@@ -69,9 +63,24 @@ router.post('/', verifyToken, requireRole('admin'), upload.single('file'), async
     if (!title || !reportDate || !req.file) return res.status(400).json({ message: 'Missing fields' });
 
     let fileUrl = '';
-    if (req.file && req.file.location) {
-      // multer-s3 provides `location`
-      fileUrl = req.file.location;
+    if (useS3 && req.file && req.file.buffer) {
+      // upload buffer to S3 using AWS SDK v3
+      const key = Date.now() + '-' + Math.round(Math.random() * 1e9) + '-' + req.file.originalname;
+      const uploadParams = {
+        Bucket: awsBucket,
+        Key: key,
+        Body: req.file.buffer,
+        ContentType: req.file.mimetype
+      };
+
+      try {
+        const uploader = new Upload({ client: s3Client, params: uploadParams });
+        await uploader.done();
+        // Construct a public URL. If your bucket is not public, consider generating presigned URLs instead.
+        fileUrl = `https://${awsBucket}.s3.${awsRegion}.amazonaws.com/${encodeURIComponent(key)}`;
+      } catch (uploadErr) {
+        return res.status(500).json({ message: 'S3 upload failed', error: uploadErr.message });
+      }
     } else if (req.file && req.file.filename) {
       fileUrl = '/uploads/' + req.file.filename;
     }
