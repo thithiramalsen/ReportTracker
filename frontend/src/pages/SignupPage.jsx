@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import API from '../api'
 import { useNavigate } from 'react-router-dom'
 import { rules, validate as validatePw } from '../utils/passwordRules'
+import { useToast } from '../components/Toast'
 
 export default function SignupPage() {
   const [name, setName] = useState('')
@@ -11,6 +12,7 @@ export default function SignupPage() {
   const [pwStatus, setPwStatus] = useState({ valid: false, unmet: [] })
   const [error, setError] = useState(null)
   const navigate = useNavigate()
+  const toast = useToast()
 
   const submit = async (e) => {
     e.preventDefault()
@@ -31,9 +33,13 @@ export default function SignupPage() {
         setInfo({ message: res.data.message, previewUrl: res.data.previewUrl, verifyToken: res.data.verifyToken })
         return
       }
+      // show toast and navigate
+      try { toast.show('Account created', 'success') } catch(e){}
       navigate('/dashboard')
     } catch (err) {
-      setError(err?.response?.data?.message || 'Signup failed')
+      const msg = err?.response?.data?.message || 'Signup failed'
+      try { toast.show(msg, 'error') } catch(e){}
+      setError(msg)
     }
   }
 
@@ -77,7 +83,7 @@ export default function SignupPage() {
             {info.verifyToken && <div className="mt-2 text-sm">Verify Token: <code>{info.verifyToken}</code></div>}
           </div>
         )}
-        <button className="mt-3" type="submit">Create account</button>
+        <button className="mt-3 btn" type="submit">Create account</button>
       </form>
     </div>
   )

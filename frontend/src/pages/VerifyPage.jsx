@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import API from '../api'
+import { useToast } from '../components/Toast'
 
 function useQuery() {
   return new URLSearchParams(useLocation().search)
@@ -11,6 +12,7 @@ export default function VerifyPage() {
   const navigate = useNavigate()
   const token = query.get('token')
   const [status, setStatus] = useState('Verifying...')
+  const toast = useToast()
 
   useEffect(() => {
     if (!token) {
@@ -21,6 +23,7 @@ export default function VerifyPage() {
     API.get(`/auth/verify?token=${token}`)
       .then(res => {
         setStatus(res.data.message || 'Verified')
+        try { toast.show('Account verified', 'success') } catch(e){}
         setTimeout(() => navigate('/login'), 1500)
       })
       .catch(err => setStatus(err?.response?.data?.message || 'Verification failed'))
