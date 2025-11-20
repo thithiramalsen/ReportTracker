@@ -9,6 +9,10 @@ const Report = require('../models/Report');
 const ReportAccess = require('../models/ReportAccess');
 const User = require('../models/User');
 const { verifyToken, requireRole } = require('../middleware/authMiddleware');
+const fs = require('fs');
+const { promisify } = require('util');
+const unlinkAsync = promisify(fs.unlink);
+const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
 
 // Configure storage: prefer S3 when env vars are present, otherwise local disk
 let upload;
@@ -117,7 +121,14 @@ router.get('/', verifyToken, async (req, res) => {
   try {
     if (req.user.role === 'admin') {
       const reports = await Report.find().sort({ reportDate: -1 });
-      return res.json(reports);
+      // attach assigned users for admin view
+      const results = [];
+      for (const r of reports) {
+        const accesses = await ReportAccess.find({ reportId: r._id }).populate('userId', 'name email');
+        const users = accesses.map(a => ({ id: a.userId._id, name: a.userId.name, email: a.userId.email }));
+        results.push(Object.assign(r.toObject(), { assignedUsers: users }));
+      }
+      return res.json(results);
     }
 
     // user: find reportIds from ReportAccess
@@ -125,6 +136,113 @@ router.get('/', verifyToken, async (req, res) => {
     const reportIds = accesses.map(a => a.reportId);
     const reports = await Report.find({ _id: { $in: reportIds } }).sort({ reportDate: -1 });
     res.json(reports);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// GET /api/reports/:id/download - allow admin or assigned users to download
+router.get('/:id/download', verifyToken, async (req, res) => {
+  try {
+    const report = await Report.findById(req.params.id);
+    if (!report) return res.status(404).json({ message: 'Report not found' });
+
+    // Check access
+    if (req.user.role !== 'admin') {
+      const access = await ReportAccess.findOne({ reportId: report._id, userId: req.user.id });
+      if (!access) return res.status(403).json({ message: 'Not authorized to access this report' });
+    }
+
+    const url = report.fileUrl;
+    if (!url) return res.status(404).json({ message: 'File not available' });
+
+    if (useS3 && url.startsWith('http')) {
+      // redirect to S3 URL (assumes public)
+      return res.redirect(url);
+    }
+
+    // local file
+    if (url.startsWith('/uploads/')) {
+      const filename = url.replace('/uploads/', '');
+      const filePath = path.join(__dirname, '..', 'uploads', filename);
+      if (!fs.existsSync(filePath)) return res.status(404).json({ message: 'File missing on server' });
+      return res.download(filePath);
+    }
+
+    // fallback: redirect to url
+    return res.redirect(url);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// DELETE /api/reports/:id - admin only: delete report and associated access and file
+router.delete('/:id', verifyToken, requireRole('admin'), async (req, res) => {
+  try {
+    const report = await Report.findById(req.params.id);
+    if (!report) return res.status(404).json({ message: 'Report not found' });
+
+    const fileUrl = report.fileUrl || '';
+
+    // delete file from S3 or local
+    if (useS3 && fileUrl.startsWith('http')) {
+      // extract key from URL
+      try {
+        const parts = fileUrl.split('/');
+        const key = decodeURIComponent(parts.slice(3).join('/').split('/').slice(1).join('/'));
+        // Above parsing is brittle; instead, remove bucket host prefix
+        // Find index of bucket name
+        const idx = fileUrl.indexOf(`/${awsBucket}/`);
+        let objectKey = key;
+        if (idx !== -1) {
+          objectKey = fileUrl.substring(idx + awsBucket.length + 2);
+        }
+        await s3Client.send(new DeleteObjectCommand({ Bucket: awsBucket, Key: objectKey }));
+      } catch (e) {
+        // log and continue
+        console.error('S3 delete failed', e.message);
+      }
+    } else if (fileUrl.startsWith('/uploads/')) {
+      const filename = fileUrl.replace('/uploads/', '');
+      const filePath = path.join(__dirname, '..', 'uploads', filename);
+      if (fs.existsSync(filePath)) {
+        try { await unlinkAsync(filePath); } catch (e) { console.error('unlink failed', e.message); }
+      }
+    }
+
+    // remove access records and report
+    await ReportAccess.deleteMany({ reportId: report._id });
+    await report.remove();
+
+    res.json({ message: 'Report deleted' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// PATCH /api/reports/:id/assign - admin only: update assigned users
+router.patch('/:id/assign', verifyToken, requireRole('admin'), async (req, res) => {
+  try {
+    const { userIds } = req.body; // expect array
+    const report = await Report.findById(req.params.id);
+    if (!report) return res.status(404).json({ message: 'Report not found' });
+
+    let parsed = [];
+    if (Array.isArray(userIds)) parsed = userIds;
+    else if (typeof userIds === 'string') {
+      try { parsed = JSON.parse(userIds); } catch (e) { parsed = userIds.split(',').map(s=>s.trim()); }
+    }
+
+    // replace access records
+    await ReportAccess.deleteMany({ reportId: report._id });
+    if (parsed.length) {
+      const accessRecords = parsed.map(uid => ({ reportId: report._id, userId: uid }));
+      await ReportAccess.insertMany(accessRecords);
+    }
+
+    const accesses = await ReportAccess.find({ reportId: report._id }).populate('userId', 'name email');
+    const users = accesses.map(a => ({ id: a.userId._id, name: a.userId.name, email: a.userId.email }));
+    res.json({ message: 'Assignments updated', assignedUsers: users });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
