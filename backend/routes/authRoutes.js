@@ -11,10 +11,11 @@ const { validatePassword } = require('../utils/password');
 
 // Admin creates users
 router.post('/register', verifyToken, requireRole('admin'), async (req, res) => {
-  const { name, email, password, role } = req.body;
+  let { name, email, password, role } = req.body;
   if (!name || !email || !password) return res.status(400).json({ message: 'Missing fields' });
 
   try {
+    email = String(email).trim().toLowerCase();
     const existing = await User.findOne({ email });
     if (existing) return res.status(400).json({ message: 'User already exists' });
 
@@ -36,10 +37,11 @@ router.post('/register', verifyToken, requireRole('admin'), async (req, res) => 
 
 // Public signup - create account as 'user'
 router.post('/signup', async (req, res) => {
-  const { name, email, password } = req.body;
+  let { name, email, password } = req.body;
   if (!name || !email || !password) return res.status(400).json({ message: 'Missing fields' });
 
   try {
+    email = String(email).trim().toLowerCase();
     const existing = await User.findOne({ email });
     if (existing) return res.status(400).json({ message: 'User already exists' });
 
@@ -86,8 +88,9 @@ router.get('/verify', async (req, res) => {
 
 // Forgot password: generate reset token and email it (or return token if SMTP not configured)
 router.post('/forgot', async (req, res) => {
-  const { email } = req.body;
+  let { email } = req.body;
   if (!email) return res.status(400).json({ message: 'Missing email' });
+  email = String(email).trim().toLowerCase();
   try {
     const user = await User.findOne({ email });
     if (!user) return res.status(200).json({ message: 'If that email exists, a reset link was sent' });
@@ -139,10 +142,11 @@ router.post('/reset', async (req, res) => {
 
 // Login
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
+  let { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ message: 'Missing fields' });
 
   try {
+    email = String(email).trim().toLowerCase();
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ message: 'Invalid credentials' });
 
