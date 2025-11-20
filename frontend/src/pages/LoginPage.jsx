@@ -40,6 +40,9 @@ export default function LoginPage() {
         {error && <div className="text-red-600">{error}</div>}
         <button className="mt-3" type="submit">Login</button>
       </form>
+      <div className="mt-3 text-sm">
+        <a className="text-blue-600" href="/forgot">Forgot password?</a>
+      </div>
     </div>
   )
 }
