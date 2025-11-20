@@ -1,10 +1,12 @@
 import React, { useState } from 'react'
 import API from '../api'
+import { useToast } from '../components/Toast'
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('')
   const [message, setMessage] = useState(null)
   const [error, setError] = useState(null)
+  const toast = useToast()
 
   const submit = async (e) => {
     e.preventDefault()
@@ -15,8 +17,11 @@ export default function ForgotPassword() {
       if (res.data.resetToken) msg = `${res.data.message} Token: ${res.data.resetToken}`
       setMessage(msg)
       if (res.data.previewUrl) setPreview(res.data.previewUrl)
+        try { toast.show('Reset email sent', 'success') } catch(e){}
     } catch (err) {
-      setError(err?.response?.data?.message || 'Error')
+      const em = err?.response?.data?.message || 'Error'
+        try { toast.show(em, 'error') } catch(e){}
+      setError(em)
     }
   }
 

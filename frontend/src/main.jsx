@@ -12,6 +12,7 @@ import ResetPassword from './pages/ResetPassword'
 import VerifyPage from './pages/VerifyPage'
 import UserSettings from './pages/UserSettings'
 import Navbar from './components/Navbar'
+import ToastProvider from './components/Toast'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminRoute from './components/AdminRoute'
 
@@ -20,6 +21,7 @@ import './styles.css'
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
+      <ToastProvider>
       <div>
         <Navbar />
         <Routes>
@@ -35,6 +37,7 @@ createRoot(document.getElementById('root')).render(
           <Route path='/admin/users' element={<AdminRoute><AdminUsers /></AdminRoute>} />
         </Routes>
       </div>
+      </ToastProvider>
     </BrowserRouter>
   </React.StrictMode>
 )

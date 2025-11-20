@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import API from '../api'
+import { useToast } from '../components/Toast'
 import { useNavigate } from 'react-router-dom'
 
 export default function LoginPage() {
@@ -7,6 +8,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
   const navigate = useNavigate()
+  const toast = useToast()
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -19,9 +21,12 @@ export default function LoginPage() {
       const res = await API.post('/auth/login', { email, password })
       localStorage.setItem('token', res.data.token)
       localStorage.setItem('user', JSON.stringify(res.data.user))
+      try{ toast.show('Logged in', 'success') }catch(e){}
       navigate('/dashboard')
     } catch (err) {
-      setError(err?.response?.data?.message || 'Login failed')
+      const em = err?.response?.data?.message || 'Login failed'
+      try{ toast.show(em, 'error') }catch(e){}
+      setError(em)
     }
   }
 

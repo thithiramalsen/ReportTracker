@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import API from '../api'
 import { rules, validate as validatePw } from '../utils/passwordRules'
+import { useToast } from '../components/Toast'
 
 export default function ResetPassword() {
   const { token } = useParams()
@@ -11,6 +12,7 @@ export default function ResetPassword() {
   const [message, setMessage] = useState(null)
   const [pwErrors, setPwErrors] = useState([])
   const [pwStatus, setPwStatus] = useState({ valid: false, unmet: [] })
+  const toast = useToast()
 
   const submit = async (e) => {
     e.preventDefault()
@@ -26,9 +28,12 @@ export default function ResetPassword() {
     try {
       const res = await API.post('/auth/reset', { token, password })
       setMessage(res.data.message || 'Password reset')
+      try { toast.show('Password reset successful', 'success') } catch(e){}
       setTimeout(() => navigate('/login'), 1200)
     } catch (err) {
-      setError(err?.response?.data?.message || 'Error')
+      const em = err?.response?.data?.message || 'Error'
+      try { toast.show(em, 'error') } catch(e){}
+      setError(em)
     }
   }
 

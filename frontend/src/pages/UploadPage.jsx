@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import API from '../api'
+import { UploadCloud } from 'lucide-react'
+import { useToast } from '../components/Toast'
 
 export default function UploadPage() {
   const [title, setTitle] = useState('')
@@ -8,6 +10,7 @@ export default function UploadPage() {
   const [file, setFile] = useState(null)
   const [users, setUsers] = useState([])
   const [selected, setSelected] = useState([])
+  const toast = useToast()
 
   useEffect(() => {
     API.get('/users')
@@ -17,7 +20,7 @@ export default function UploadPage() {
 
   const submit = async (e) => {
     e.preventDefault()
-    if (!file) return alert('Select PDF')
+    if (!file) return tryToast('Select PDF', 'error')
 
     const form = new FormData()
     form.append('title', title)
@@ -28,10 +31,21 @@ export default function UploadPage() {
 
     try {
       await API.post('/reports', form, { headers: { 'Content-Type': 'multipart/form-data' } })
-      alert('Uploaded')
+      try { toast.show('Uploaded', 'success') } catch(e){}
+      // clear form
+      setTitle('')
+      setDescription('')
+      setReportDate('')
+      setFile(null)
+      setSelected([])
     } catch (err) {
-      alert(err?.response?.data?.message || 'Upload failed')
+      const em = err?.response?.data?.message || 'Upload failed'
+      try { toast.show(em, 'error') } catch(e){}
     }
+  }
+
+  function tryToast(msg, type='info'){
+    try{ toast.show(msg, type) }catch(e){ alert(msg) }
   }
 
   const toggle = (id) => {
@@ -40,7 +54,7 @@ export default function UploadPage() {
 
   return (
     <div className="max-w-2xl mx-auto mt-6 card">
-      <h3 className="text-xl mb-3">Upload Report (Admin)</h3>
+      <h3 className="text-xl mb-3 flex items-center gap-2"><UploadCloud className="w-5 h-5 text-gray-600"/> Upload Report (Admin)</h3>
       <form onSubmit={submit}>
         <div>
           <label className="block text-sm">Title</label>
