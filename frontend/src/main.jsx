@@ -10,6 +10,7 @@ import AdminUsers from './pages/AdminUsers'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import VerifyPage from './pages/VerifyPage'
+import UserSettings from './pages/UserSettings'
 import Navbar from './components/Navbar'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminRoute from './components/AdminRoute'
@@ -29,6 +30,7 @@ createRoot(document.getElementById('root')).render(
           <Route path='/reset/:token' element={<ResetPassword />} />
           <Route path='/verify' element={<VerifyPage />} />
           <Route path='/dashboard' element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path='/settings' element={<ProtectedRoute><UserSettings /></ProtectedRoute>} />
           <Route path='/upload' element={<AdminRoute><UploadPage /></AdminRoute>} />
           <Route path='/admin/users' element={<AdminRoute><AdminUsers /></AdminRoute>} />
         </Routes>
