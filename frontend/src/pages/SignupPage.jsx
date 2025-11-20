@@ -83,7 +83,7 @@ export default function SignupPage() {
             {info.verifyToken && <div className="mt-2 text-sm">Verify Token: <code>{info.verifyToken}</code></div>}
           </div>
         )}
-        <button className="mt-3" type="submit">Create account</button>
+        <button className="mt-3 btn" type="submit">Create account</button>
       </form>
     </div>
   )

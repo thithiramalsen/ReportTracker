@@ -43,7 +43,7 @@ export default function LoginPage() {
           <input type="password" value={password} onChange={e => setPassword(e.target.value)} />
         </div>
         {error && <div className="text-red-600">{error}</div>}
-        <button className="mt-3" type="submit">Login</button>
+        <button className="mt-3 btn" type="submit">Login</button>
       </form>
       <div className="mt-3 text-sm">
         <a className="text-blue-600" href="/forgot">Forgot password?</a>

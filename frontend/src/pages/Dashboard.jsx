@@ -1,14 +1,27 @@
 import React, { useEffect, useState } from 'react'
 import API from '../api'
-import { FileText } from 'lucide-react'
+import { FileText, Eye } from 'lucide-react'
 
 function ReportCard({ r }) {
+  const openReport = async (id) => {
+    try {
+      const resp = await API.get(`/reports/${id}/download`, { responseType: 'blob' })
+      const blob = new Blob([resp.data], { type: resp.data.type || 'application/pdf' })
+      const url = window.URL.createObjectURL(blob)
+      window.open(url, '_blank')
+      setTimeout(() => window.URL.revokeObjectURL(url), 10000)
+    } catch (err) {
+      console.error(err)
+      alert('Unable to open report')
+    }
+  }
+
   return (
     <div className="card mb-3">
       <h4 className="text-lg font-semibold">{r.title}</h4>
       <div className="text-sm text-gray-600">{r.description}</div>
       <div className="text-sm text-gray-500">{new Date(r.reportDate).toLocaleDateString()}</div>
-      <a className="text-blue-600" href={r.fileUrl} target="_blank" rel="noreferrer">View PDF</a>
+      <button onClick={() => openReport(r._id)} className="text-blue-600 inline-flex items-center gap-2"><Eye className="w-4 h-4"/>View PDF</button>
     </div>
   )
 }

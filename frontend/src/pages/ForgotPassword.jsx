@@ -38,7 +38,7 @@ export default function ForgotPassword() {
         {error && <div className="text-red-600">{error}</div>}
         {message && <div className="text-green-600">{message}</div>}
         {preview && <div className="mt-2"><a className="text-blue-600" target="_blank" rel="noreferrer" href={preview}>Open email preview</a></div>}
-        <button className="mt-3" type="submit">Send reset link</button>
+        <button className="mt-3 btn" type="submit">Send reset link</button>
       </form>
     </div>
   )

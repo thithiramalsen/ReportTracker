@@ -61,7 +61,7 @@ export default function ResetPassword() {
         </div>
         {error && <div className="text-red-600">{error}</div>}
         {message && <div className="text-green-600">{message}</div>}
-        <button className="mt-3" type="submit">Reset password</button>
+        <button className="mt-3 btn" type="submit">Reset password</button>
       </form>
     </div>
   )
