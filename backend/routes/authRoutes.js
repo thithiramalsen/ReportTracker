@@ -65,7 +65,12 @@ router.post('/signup', async (req, res) => {
       const admins = await User.find({ role: 'admin' }).select('_id');
       if (admins && admins.length) {
         const notifs = admins.map(a => ({ userId: a._id, type: 'new_signup', message: `New signup: ${user.name} (${user.code})`, data: { userId: user._id, code: user.code } }));
-        await Notification.insertMany(notifs);
+        const created = await Notification.insertMany(notifs);
+        // push SSE events
+        try {
+          const notifier = require('../utils/notifier');
+          created.forEach(n => notifier.sendEvent('notification', n));
+        } catch (e) { console.error('Failed to send SSE for signup', e.message) }
       }
     } catch (e) {
       console.error('Failed to create admin notifications', e.message);

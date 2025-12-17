@@ -138,7 +138,14 @@ router.post('/', verifyToken, requireRole('admin'), upload.single('file'), async
           message: `New report: ${report.title}`,
           data: { reportId: report._id, downloadUrl: `/api/reports/${report._id}/download` }
         }));
-        if (notifs.length) await Notification.insertMany(notifs);
+        if (notifs.length) {
+          const created = await Notification.insertMany(notifs);
+          // push SSE events
+          try {
+            const notifier = require('../utils/notifier');
+            created.forEach(n => notifier.sendEvent('notification', n));
+          } catch (e) { console.error('Failed to send SSE for report notifications', e.message) }
+        }
       } catch (e) {
         console.error('Failed to create notifications for users', e.message);
       }

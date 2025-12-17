@@ -7,6 +7,30 @@ export default function Notifications(){
   const [list, setList] = useState([])
   const toast = useToast()
 
+  const openReportByUrl = async (url) => {
+    // normalize URL: API.baseURL already includes '/api', so strip leading '/api' to avoid duplication
+    let path = url
+    try {
+      if (!url) throw new Error('no url')
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        path = url
+      } else if (url.startsWith('/api/')) {
+        path = url.replace(/^\/api/, '')
+      }
+    } catch (err) { console.error('openReportByUrl - invalid url', err); try { toast.show('Invalid report URL', 'error') } catch(e){}; return }
+
+    try {
+      const resp = await API.get(path, { responseType: 'blob' })
+      const blob = new Blob([resp.data], { type: (resp.data && resp.data.type) || 'application/pdf' })
+      const u = window.URL.createObjectURL(blob)
+      window.open(u, '_blank')
+      setTimeout(() => window.URL.revokeObjectURL(u), 10000)
+    } catch (err) {
+      console.error('failed to fetch report blob', err)
+      try { toast.show('Failed to open report', 'error') } catch(e){}
+    }
+  }
+
   const load = async () => {
     try {
       const res = await API.get('/notifications')
@@ -15,6 +39,23 @@ export default function Notifications(){
   }
 
   useEffect(()=>{ load() }, [])
+
+  // SSE: open EventSource to receive live notifications
+  useEffect(()=>{
+    const token = localStorage.getItem('token')
+    if (!token) return
+    const base = import.meta.env.VITE_API_BASE || 'http://localhost:5000/api'
+    const es = new EventSource(`${base}/notifications/stream?token=${token}`)
+    es.addEventListener('notification', (e) => {
+      try {
+        const n = JSON.parse(e.data)
+        setList(prev => [n, ...prev])
+        try { toast.show('New notification', 'info') } catch(e){}
+      } catch (err) { console.error('invalid SSE data', err) }
+    })
+    es.onerror = () => { es.close() }
+    return () => es.close()
+  }, [])
 
   const markRead = async (id) => {
     try {
@@ -37,7 +78,7 @@ export default function Notifications(){
                 <div>
                   <div className="font-medium">{n.message}</div>
                   <div className="text-sm text-gray-600 mt-1">{new Date(n.createdAt).toLocaleString()}</div>
-                  {n.data?.downloadUrl && (<div className="mt-2"><a className="text-blue-600" href={n.data.downloadUrl}>Open report</a></div>)}
+                  {n.data?.downloadUrl && (<div className="mt-2"><button className="text-blue-600" onClick={()=> openReportByUrl(n.data.downloadUrl)}>Open report</button></div>)}
                 </div>
                 <div>
                   {!n.read && <button className="px-2 py-1 bg-green-600 text-white rounded" onClick={()=>markRead(n._id)}>Mark read</button>}

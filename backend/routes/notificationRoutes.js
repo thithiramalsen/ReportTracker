@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const Notification = require('../models/Notification');
 const { verifyToken } = require('../middleware/authMiddleware');
+const jwt = require('jsonwebtoken');
+const notifier = require('../utils/notifier');
 
 // GET /api/notifications - user's notifications
 router.get('/', verifyToken, async (req, res) => {
@@ -24,6 +26,34 @@ router.patch('/:id/read', verifyToken, async (req, res) => {
     res.json({ message: 'Marked read' });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// SSE stream for notifications: /api/notifications/stream?token=JWT
+router.get('/stream', async (req, res) => {
+  try {
+    const token = req.query.token || (req.headers.authorization && req.headers.authorization.split(' ')[1]);
+    if (!token) return res.status(401).end();
+    let payload;
+    try { payload = jwt.verify(token, process.env.JWT_SECRET); } catch (e) { return res.status(401).end(); }
+
+    // headers for SSE
+    res.writeHead(200, {
+      Connection: 'keep-alive',
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache'
+    });
+    res.write('\n');
+
+    // add client
+    notifier.addClient(res);
+
+    req.on('close', () => {
+      notifier.removeClient(res);
+    });
+  } catch (err) {
+    console.error('SSE stream error', err.message);
+    res.status(500).end();
   }
 });
 
