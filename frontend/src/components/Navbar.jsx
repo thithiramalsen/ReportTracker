@@ -29,6 +29,7 @@ export default function Navbar() {
         <Link className="flex items-center gap-1 text-sm text-gray-700" to="/dashboard"><Home className="w-4 h-4"/> Dashboard</Link>
         {user?.role === 'admin' && <Link className="flex items-center gap-1 text-sm text-gray-700" to="/upload"><UploadCloud className="w-4 h-4"/> Upload</Link>}
         {user?.role === 'admin' && <Link className="text-sm text-gray-700" to="/admin/users">Manage Users</Link>}
+        {user?.role === 'admin' && <Link className="text-sm text-gray-700" to="/admin/codes">Manage Codes</Link>}
         {user ? (
           <>
             <Link className="flex items-center gap-2" to="/settings"><User className="w-5 h-5 text-gray-600"/>

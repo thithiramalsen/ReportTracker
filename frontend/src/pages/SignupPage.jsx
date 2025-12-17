@@ -9,13 +9,18 @@ export default function SignupPage() {
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [pwStatus, setPwStatus] = useState({ valid: false, unmet: [] })
   const [codes, setCodes] = useState([])
   const [error, setError] = useState(null)
   const toast = useToast()
 
   useEffect(() => {
-    API.get('/codes/available').then(res => setCodes(res.data)).catch(err => console.error(err))
+    let mounted = true
+    const fetch = () => API.get('/codes/available').then(res => { if (mounted) setCodes(res.data) }).catch(err => console.error(err))
+    fetch()
+    const iv = setInterval(fetch, 8000)
+    return () => { mounted = false; clearInterval(iv) }
   }, [])
 
   const onPasswordChange = (v) => {
@@ -72,7 +77,10 @@ export default function SignupPage() {
         </div>
         <div className="mt-3">
           <label className="block text-sm">Password</label>
-          <input type="password" value={password} onChange={e => onPasswordChange(e.target.value)} />
+          <div className="flex items-center gap-2">
+            <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => onPasswordChange(e.target.value)} />
+            <button type="button" className="text-sm text-gray-600" onClick={() => setShowPassword(s => !s)}>{showPassword ? 'Hide' : 'Show'}</button>
+          </div>
           <div className="mt-2 text-sm">
             {rules.map(r => (
               <div key={r.key} className={pwStatus.unmet?.includes(r.key) ? 'text-red-600' : 'text-green-600'}>
