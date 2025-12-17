@@ -7,10 +7,14 @@ import Dashboard from './pages/Dashboard'
 import UploadPage from './pages/UploadPage'
 import SignupPage from './pages/SignupPage'
 import AdminUsers from './pages/AdminUsers'
+import AdminCodes from './pages/AdminCodes'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import VerifyPage from './pages/VerifyPage'
+import WaitingPage from './pages/WaitingPage'
+import UserSettings from './pages/UserSettings'
 import Navbar from './components/Navbar'
+import ToastProvider from './components/Toast'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminRoute from './components/AdminRoute'
 
@@ -19,6 +23,7 @@ import './styles.css'
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
+      <ToastProvider>
       <div>
         <Navbar />
         <Routes>
@@ -28,11 +33,15 @@ createRoot(document.getElementById('root')).render(
           <Route path='/forgot' element={<ForgotPassword />} />
           <Route path='/reset/:token' element={<ResetPassword />} />
           <Route path='/verify' element={<VerifyPage />} />
+          <Route path='/waiting' element={<WaitingPage />} />
           <Route path='/dashboard' element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path='/settings' element={<ProtectedRoute><UserSettings /></ProtectedRoute>} />
           <Route path='/upload' element={<AdminRoute><UploadPage /></AdminRoute>} />
           <Route path='/admin/users' element={<AdminRoute><AdminUsers /></AdminRoute>} />
+          <Route path='/admin/codes' element={<AdminRoute><AdminCodes /></AdminRoute>} />
         </Routes>
       </div>
+      </ToastProvider>
     </BrowserRouter>
   </React.StrictMode>
 )

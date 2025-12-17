@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { User, LogOut, Home, UploadCloud } from 'lucide-react'
 
 export default function Navbar() {
   const [imgError, setImgError] = useState(false)
@@ -25,17 +26,19 @@ export default function Navbar() {
       </div>
 
       <div className="flex items-center gap-4">
-        <Link className="text-sm text-gray-700" to="/dashboard">Dashboard</Link>
-        {user?.role === 'admin' && <Link className="text-sm text-gray-700" to="/upload">Upload</Link>}
+        <Link className="flex items-center gap-1 text-sm text-gray-700" to="/dashboard"><Home className="w-4 h-4"/> Dashboard</Link>
+        {user?.role === 'admin' && <Link className="flex items-center gap-1 text-sm text-gray-700" to="/upload"><UploadCloud className="w-4 h-4"/> Upload</Link>}
         {user?.role === 'admin' && <Link className="text-sm text-gray-700" to="/admin/users">Manage Users</Link>}
+        {user?.role === 'admin' && <Link className="text-sm text-gray-700" to="/admin/codes">Manage Codes</Link>}
         {user ? (
           <>
-            <span className="text-sm text-gray-600">{user.name}</span>
-            <button className="px-3 py-1 bg-red-50 text-red-600 rounded" onClick={logout}>Logout</button>
+            <Link className="flex items-center gap-2" to="/settings"><User className="w-5 h-5 text-gray-600"/>
+              <span className="text-sm text-gray-600">{user.name}</span>
+            </Link>
+            <button className="px-3 py-1 bg-red-50 text-red-600 rounded flex items-center gap-2" onClick={logout}><LogOut className="w-4 h-4"/>Logout</button>
           </>
         ) : (
           <>
-            <Link className="text-sm text-gray-700" to="/signup">Sign up</Link>
             <Link className="text-sm text-blue-600" to="/login">Login</Link>
           </>
         )}
