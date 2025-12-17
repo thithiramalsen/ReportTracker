@@ -8,6 +8,7 @@ import UploadPage from './pages/UploadPage'
 import SignupPage from './pages/SignupPage'
 import AdminUsers from './pages/AdminUsers'
 import AdminCodes from './pages/AdminCodes'
+import Notifications from './pages/Notifications'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import VerifyPage from './pages/VerifyPage'
@@ -39,6 +40,7 @@ createRoot(document.getElementById('root')).render(
           <Route path='/upload' element={<AdminRoute><UploadPage /></AdminRoute>} />
           <Route path='/admin/users' element={<AdminRoute><AdminUsers /></AdminRoute>} />
           <Route path='/admin/codes' element={<AdminRoute><AdminCodes /></AdminRoute>} />
+          <Route path='/notifications' element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
         </Routes>
       </div>
       </ToastProvider>

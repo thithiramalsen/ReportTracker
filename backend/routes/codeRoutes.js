@@ -6,7 +6,7 @@ const { verifyToken, requireRole } = require('../middleware/authMiddleware');
 // Admin: list all code slots
 router.get('/', verifyToken, requireRole('admin'), async (req, res) => {
   try {
-    const codes = await CodeSlot.find().sort({ code: 1 });
+    const codes = await CodeSlot.find().sort({ code: 1 }).populate('usedBy', 'name code phone email');
     res.json(codes);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });

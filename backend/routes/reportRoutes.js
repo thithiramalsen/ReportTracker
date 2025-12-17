@@ -97,7 +97,7 @@ router.post('/', verifyToken, requireRole('admin'), upload.single('file'), async
     });
     await report.save();
 
-    // Assign to users
+    // Assign to users (accepts userIds and/or codes)
     let parsedUserIds = [];
     if (userIds) {
       try {
@@ -108,11 +108,42 @@ router.post('/', verifyToken, requireRole('admin'), upload.single('file'), async
       }
     }
 
+    // If codes provided, resolve users with those division codes
+    let parsedCodes = [];
+    if (req.body.codes) {
+      try {
+        parsedCodes = typeof req.body.codes === 'string' ? JSON.parse(req.body.codes) : req.body.codes;
+      } catch (e) {
+        parsedCodes = typeof req.body.codes === 'string' ? req.body.codes.split(',').map(s => s.trim().toLowerCase()) : [];
+      }
+      if (parsedCodes && parsedCodes.length) {
+        const usersFromCodes = await User.find({ code: { $in: parsedCodes.map(c => String(c).trim().toLowerCase()) } }).select('_id');
+        const idsFromCodes = usersFromCodes.map(u => String(u._id));
+        parsedUserIds = Array.from(new Set([...parsedUserIds, ...idsFromCodes]));
+      }
+    }
+
     const accessRecords = parsedUserIds.map((uid) => ({ reportId: report._id, userId: uid }));
     if (accessRecords.length) await ReportAccess.insertMany(accessRecords);
 
     if (parsedUserIds.length) {
       const assignedUsers = await User.find({ _id: { $in: parsedUserIds } }).select('name phone code email');
+
+      // create in-app notifications for assigned users
+      try {
+        const Notification = require('../models/Notification');
+        const notifs = assignedUsers.filter(u => u).map(u => ({
+          userId: u._id,
+          type: 'report_uploaded',
+          message: `New report: ${report.title}`,
+          data: { reportId: report._id, downloadUrl: `/api/reports/${report._id}/download` }
+        }));
+        if (notifs.length) await Notification.insertMany(notifs);
+      } catch (e) {
+        console.error('Failed to create notifications for users', e.message);
+      }
+
+      // non-blocking WhatsApp notify (placeholder)
       notifyReportUpload({ report, users: assignedUsers }).catch(err => console.error('whatsapp notify failed', err.message));
     }
 
@@ -190,35 +221,35 @@ router.delete('/:id', verifyToken, requireRole('admin'), async (req, res) => {
 
     const fileUrl = report.fileUrl || '';
 
-    // delete file from S3 or local
-    if (useS3 && fileUrl.startsWith('http')) {
-      // extract key from URL
-      try {
-        const parts = fileUrl.split('/');
-        const key = decodeURIComponent(parts.slice(3).join('/').split('/').slice(1).join('/'));
-        // Above parsing is brittle; instead, remove bucket host prefix
-        // Find index of bucket name
-        const idx = fileUrl.indexOf(`/${awsBucket}/`);
-        let objectKey = key;
-        if (idx !== -1) {
-          objectKey = fileUrl.substring(idx + awsBucket.length + 2);
+    // attempt to delete file (S3 or local), but don't block report deletion
+    try {
+      if (useS3 && fileUrl.startsWith('http')) {
+        try {
+          // try to extract object key by URL parsing
+          const url = new URL(fileUrl);
+          // object key is path after bucket name; try to remove leading /<bucket>/
+          let objectKey = url.pathname;
+          const bucketIndex = objectKey.indexOf(`/${awsBucket}/`);
+          if (bucketIndex !== -1) objectKey = objectKey.substring(bucketIndex + awsBucket.length + 2);
+          if (objectKey.startsWith('/')) objectKey = objectKey.substring(1);
+          await s3Client.send(new DeleteObjectCommand({ Bucket: awsBucket, Key: objectKey }));
+        } catch (s3err) {
+          console.error('S3 delete failed', s3err.message);
         }
-        await s3Client.send(new DeleteObjectCommand({ Bucket: awsBucket, Key: objectKey }));
-      } catch (e) {
-        // log and continue
-        console.error('S3 delete failed', e.message);
+      } else if (fileUrl.startsWith('/uploads/')) {
+        const filename = fileUrl.replace('/uploads/', '');
+        const filePath = path.join(__dirname, '..', 'uploads', filename);
+        if (fs.existsSync(filePath)) {
+          try { await unlinkAsync(filePath); } catch (e) { console.error('unlink failed', e.message); }
+        }
       }
-    } else if (fileUrl.startsWith('/uploads/')) {
-      const filename = fileUrl.replace('/uploads/', '');
-      const filePath = path.join(__dirname, '..', 'uploads', filename);
-      if (fs.existsSync(filePath)) {
-        try { await unlinkAsync(filePath); } catch (e) { console.error('unlink failed', e.message); }
-      }
+    } catch (e) {
+      console.error('File deletion attempt failed', e.message);
     }
 
-    // remove access records and report
-    await ReportAccess.deleteMany({ reportId: report._id });
-    await report.remove();
+    // remove access records and report (ensure these run)
+    try { await ReportAccess.deleteMany({ reportId: report._id }); } catch (e) { console.error('Failed to delete access records', e.message); }
+    try { await report.deleteOne(); } catch (e) { console.error('Failed to delete report record', e.message); }
 
     res.json({ message: 'Report deleted' });
   } catch (err) {

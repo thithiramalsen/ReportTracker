@@ -9,7 +9,9 @@ export default function UploadPage() {
   const [reportDate, setReportDate] = useState('')
   const [file, setFile] = useState(null)
   const [users, setUsers] = useState([])
+  const [codes, setCodes] = useState([])
   const [selected, setSelected] = useState([])
+  const [selectedCodes, setSelectedCodes] = useState([])
   const [reports, setReports] = useState([])
   const [editingReport, setEditingReport] = useState(null)
   const toast = useToast()
@@ -19,6 +21,7 @@ export default function UploadPage() {
     API.get('/users')
       .then(res => setUsers(res.data))
       .catch(err => console.error(err))
+    API.get('/codes').then(res => setCodes(res.data)).catch(()=>{})
     fetchReports()
   }, [])
 
@@ -42,7 +45,7 @@ export default function UploadPage() {
     form.append('description', description)
     form.append('reportDate', reportDate)
     form.append('file', file)
-    form.append('userIds', JSON.stringify(selected))
+    if (selectedCodes && selectedCodes.length) form.append('codes', JSON.stringify(selectedCodes))
 
     try {
       await API.post('/reports', form, { headers: { 'Content-Type': 'multipart/form-data' } })
@@ -55,6 +58,7 @@ export default function UploadPage() {
       setReportDate('')
       setFile(null)
       setSelected([])
+      setSelectedCodes([])
     } catch (err) {
       const em = err?.response?.data?.message || 'Upload failed'
       try { toast.show(em, 'error') } catch(e){}
@@ -103,7 +107,8 @@ export default function UploadPage() {
       fetchReports()
     } catch (err) {
       console.error(err)
-      try { toast.show('Delete failed', 'error') } catch(e){}
+      const em = err?.response?.data?.message || 'Delete failed'
+      try { toast.show(em, 'error') } catch(e){}
     }
   }
 
@@ -143,13 +148,13 @@ export default function UploadPage() {
         </div>
 
         <div className="mt-3">
-          <label className="block text-sm">Assign to users</label>
-          <select multiple value={selected} onChange={e => setSelected(Array.from(e.target.selectedOptions, o=>o.value))} className="w-full border p-2 mt-1 rounded">
-            {users.map(u => (
-              <option key={u._id} value={u._id}>{u.name} — {u.code}{u.phone ? ` (${u.phone})` : ''}</option>
+          <label className="block text-sm">Assign by Division Codes</label>
+          <select multiple value={selectedCodes} onChange={e => setSelectedCodes(Array.from(e.target.selectedOptions, o=>o.value))} className="w-full border p-2 mt-1 rounded h-40">
+            {codes.map(c => (
+              <option key={c._id} value={c.code}>{c.code}{c.label ? ` — ${c.label}` : ''} {c.usedBy ? ` — ${c.usedBy.name}` : ' — (unassigned)'} ({c.role || 'user'})</option>
             ))}
           </select>
-          <div className="text-xs text-gray-500 mt-1">Hold Ctrl (Windows) or Cmd (Mac) to select multiple users.</div>
+          <div className="text-xs text-gray-500 mt-1">Select division codes to assign everyone in those divisions.</div>
         </div>
 
         <button disabled={isUploading} className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded" type="submit">

@@ -11,6 +11,7 @@ const authRoutes = require('./routes/authRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const userRoutes = require('./routes/userRoutes');
 const codeRoutes = require('./routes/codeRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 const app = express();
 app.use(cors());
@@ -30,6 +31,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/codes', codeRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Health
 app.get('/api/health', (req, res) => res.json({ ok: true }));
