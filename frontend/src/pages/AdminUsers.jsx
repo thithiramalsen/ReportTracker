@@ -33,8 +33,8 @@ export default function AdminUsers() {
         {users.map(u => (
           <div key={u._id} className="flex justify-between items-center py-2">
             <div>
-              <div className="font-medium">{u.name}</div>
-              <div className="text-sm text-gray-600">{u.email} • {u.role}</div>
+              <div className="font-medium">{u.name} ({u.code})</div>
+              <div className="text-sm text-gray-600">Role: {u.role} • Phone: {u.phone || '—'}{u.email ? ` • Email: ${u.email}` : ''}</div>
             </div>
             <div>
               <button className="px-3 py-1 bg-red-600 text-white rounded" onClick={()=>remove(u._id)}>Delete</button>

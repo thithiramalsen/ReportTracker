@@ -38,7 +38,6 @@ export default function Navbar() {
           </>
         ) : (
           <>
-            <Link className="text-sm text-gray-700" to="/signup">Sign up</Link>
             <Link className="text-sm text-blue-600" to="/login">Login</Link>
           </>
         )}

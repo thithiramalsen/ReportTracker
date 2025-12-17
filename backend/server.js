@@ -10,6 +10,7 @@ dotenv.config();
 const authRoutes = require('./routes/authRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const userRoutes = require('./routes/userRoutes');
+const codeRoutes = require('./routes/codeRoutes');
 
 const app = express();
 app.use(cors());
@@ -28,6 +29,7 @@ app.use('/uploads', express.static(uploadsDir));
 app.use('/api/auth', authRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/codes', codeRoutes);
 
 // Health
 app.get('/api/health', (req, res) => res.json({ ok: true }));

@@ -146,7 +146,7 @@ export default function UploadPage() {
           <label className="block text-sm">Assign to users</label>
           <select multiple value={selected} onChange={e => setSelected(Array.from(e.target.selectedOptions, o=>o.value))} className="w-full border p-2 mt-1 rounded">
             {users.map(u => (
-              <option key={u._id} value={u._id}>{u.name} ({u.email})</option>
+              <option key={u._id} value={u._id}>{u.name} — {u.code}{u.phone ? ` (${u.phone})` : ''}</option>
             ))}
           </select>
           <div className="text-xs text-gray-500 mt-1">Hold Ctrl (Windows) or Cmd (Mac) to select multiple users.</div>
@@ -174,7 +174,7 @@ export default function UploadPage() {
                 <div>
                   <div className="font-medium">{r.title}</div>
                   <div className="text-sm text-gray-600">{new Date(r.reportDate).toLocaleDateString()} &middot; {r.description}</div>
-                  <div className="text-sm text-gray-700 mt-2">Assigned: {r.assignedUsers && r.assignedUsers.length ? r.assignedUsers.map(u=>u.name).join(', ') : '—'}</div>
+                  <div className="text-sm text-gray-700 mt-2">Assigned: {r.assignedUsers && r.assignedUsers.length ? r.assignedUsers.map(u=>u.name || u.code).join(', ') : '—'}</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button title="View" onClick={()=>openBlob(r._id)} className="px-2 py-1 border rounded" aria-label="view"><Eye className="w-4 h-4"/></button>
@@ -197,9 +197,12 @@ export default function UploadPage() {
               <label className="block text-sm">Assigned users</label>
               <select multiple value={(editingReport.assignedUsers||[]).map(u=>u.id)} onChange={e=>{
                 const vals = Array.from(e.target.selectedOptions, o=>o.value)
-                setEditingReport(prev => ({ ...prev, assignedUsers: vals.map(id=> users.find(u=>u._id===id) ? { id, name: users.find(us=>us._id===id).name, email: users.find(us=>us._id===id).email } : { id } ) }))
+                setEditingReport(prev => ({ ...prev, assignedUsers: vals.map(id=> {
+                  const found = users.find(u=>u._id===id)
+                  return found ? { id, name: found.name, code: found.code, phone: found.phone } : { id }
+                }) }))
               }} className="w-full border p-2 mt-1">
-                {users.map(u=> <option key={u._id} value={u._id}>{u.name} ({u.email})</option>)}
+                {users.map(u=> <option key={u._id} value={u._id}>{u.name} — {u.code}{u.phone ? ` (${u.phone})` : ''}</option>)}
               </select>
             </div>
             <div className="mt-3 flex justify-end gap-2">

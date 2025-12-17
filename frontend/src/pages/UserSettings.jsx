@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import API from '../api'
 import { useNavigate } from 'react-router-dom'
-import { User, Mail, Key } from 'lucide-react'
+import { User, Key } from 'lucide-react'
 
 export default function UserSettings(){
   const [user, setUser] = useState(null)
@@ -25,19 +25,16 @@ export default function UserSettings(){
         <div>
           <div className="font-semibold text-lg">{user.name}</div>
           <div className="text-sm text-gray-500">Role: {user.role}</div>
+          <div className="text-sm text-gray-500">Code: {user.code}</div>
         </div>
       </div>
 
-      <div className="space-y-3">
-        <div className="flex items-center gap-3">
-          <Mail className="w-5 h-5 text-gray-600" />
-          <div>{user.email}</div>
-        </div>
-
+      <div className="space-y-3 text-sm text-gray-700">
+        <div>Phone: {user.phone || 'Not provided'}</div>
+        <div>Email (admin notifications only): {user.email || 'Not provided'}</div>
         <div className="flex items-center gap-3">
           <Key className="w-5 h-5 text-gray-600" />
-          <div className="text-sm text-gray-600">Password: ••••••••</div>
-          <button className="ml-auto text-sm text-blue-600" onClick={()=>navigate('/forgot')}>Change</button>
+          <div className="text-sm text-gray-600">Password resets are handled by your administrator.</div>
         </div>
       </div>
     </div>

@@ -3,11 +3,12 @@ const mongoose = require('mongoose');
 const UserSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
-    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    code: { type: String, required: true, unique: true, lowercase: true, trim: true }, // division/route code used as username
+    phone: { type: String },
+    email: { type: String, lowercase: true, trim: true }, // optional; admin notifications only
     password: { type: String, required: true },
-    role: { type: String, enum: ['admin', 'user'], default: 'user' },
-    isVerified: { type: Boolean, default: false },
-    verifyToken: { type: String },
+    role: { type: String, enum: ['admin', 'manager', 'user'], default: 'user' },
+    isApproved: { type: Boolean, default: true },
     resetPasswordToken: { type: String },
     resetPasswordExpires: { type: Date }
   },

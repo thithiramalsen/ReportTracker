@@ -1,153 +1,118 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+
 const router = express.Router();
 
 const User = require('../models/User');
 const { verifyToken, requireRole } = require('../middleware/authMiddleware');
-const crypto = require('crypto');
-const { sendEmail } = require('../utils/email');
 const { validatePassword } = require('../utils/password');
+const CodeSlot = require('../models/CodeSlot');
 
-// Admin creates users
+// Admin creates users (code + password)
 router.post('/register', verifyToken, requireRole('admin'), async (req, res) => {
-  let { name, email, password, role } = req.body;
-  if (!name || !email || !password) return res.status(400).json({ message: 'Missing fields' });
+  let { name, code, password, role, phone, email } = req.body;
+  if (!name || !code || !password) return res.status(400).json({ message: 'Missing fields' });
+
+  code = String(code).trim().toLowerCase();
+  email = email ? String(email).trim().toLowerCase() : undefined;
 
   try {
-    email = String(email).trim().toLowerCase();
-    const existing = await User.findOne({ email });
-    if (existing) return res.status(400).json({ message: 'User already exists' });
+    const existing = await User.findOne({ code });
+    if (existing) return res.status(400).json({ message: 'User already exists for this code' });
 
-    // Validate password strength
     const pwCheck = validatePassword(password);
     if (!pwCheck.valid) return res.status(400).json({ message: 'Weak password', errors: pwCheck.errors });
 
-    const salt = await bcrypt.genSalt(10);
-    const hash = await bcrypt.hash(password, salt);
-
-    const user = new User({ name, email, password: hash, role: role || 'user' });
+    const hash = await bcrypt.hash(password, 10);
+    const user = new User({ name, code, password: hash, role: role || 'user', phone, email });
     await user.save();
 
-    res.status(201).json({ message: 'User created', user: { id: user._id, name: user.name, email: user.email, role: user.role } });
+    res.status(201).json({ message: 'User created', user: { id: user._id, name: user.name, code: user.code, role: user.role, phone: user.phone, email: user.email, isApproved: user.isApproved } });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
-// Public signup - create account as 'user'
+// Public signup (code + password) -> creates pending user; requires available code slot
 router.post('/signup', async (req, res) => {
-  let { name, email, password } = req.body;
-  if (!name || !email || !password) return res.status(400).json({ message: 'Missing fields' });
+  let { name, code, password, phone, email } = req.body;
+  if (!name || !code || !password) return res.status(400).json({ message: 'Missing fields' });
+
+  code = String(code).trim().toLowerCase();
+  email = email ? String(email).trim().toLowerCase() : undefined;
 
   try {
-    email = String(email).trim().toLowerCase();
-    const existing = await User.findOne({ email });
-    if (existing) return res.status(400).json({ message: 'User already exists' });
+    const slot = await CodeSlot.findOne({ code, isActive: true, usedBy: { $exists: false } });
+    if (!slot) return res.status(400).json({ message: 'Code not available. Contact admin.' });
 
-    const salt = await bcrypt.genSalt(10);
-    const hash = await bcrypt.hash(password, salt);
-    const verifyToken = crypto.randomBytes(24).toString('hex');
-    const user = new User({ name, email, password: hash, role: 'user', verifyToken, isVerified: false });
+    const existingUser = await User.findOne({ code });
+    if (existingUser) return res.status(400).json({ message: 'User already exists for this code' });
+
+    const pwCheck = validatePassword(password);
+    if (!pwCheck.valid) return res.status(400).json({ message: 'Weak password', errors: pwCheck.errors });
+
+    const hash = await bcrypt.hash(password, 10);
+    const user = new User({ name, code, password: hash, role: slot.role || 'user', phone, email, isApproved: false });
     await user.save();
+
+    slot.usedBy = user._id;
+    await slot.save();
 
     const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '8h' });
-
-    // Try sending verification email; if SMTP not configured, return token for testing
-    const verifyUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/verify?token=${verifyToken}`;
-    const message = `Please verify your account by visiting: ${verifyUrl}`;
-    try {
-      const info = await sendEmail({ to: email, subject: 'Verify your account', text: message, html: `<p>${message}</p>` });
-      const resp = { message: 'User created. Verification email sent.', token, user: { id: user._id, name: user.name, email: user.email, role: user.role } };
-      if (info && info.previewUrl) resp.previewUrl = info.previewUrl;
-      return res.status(201).json(resp);
-    } catch (e) {
-      // If sendEmail threw, fall back to returning the token for testing
-      return res.status(201).json({ message: 'User created (no SMTP)', token, user: { id: user._id, name: user.name, email: user.email, role: user.role }, verifyToken });
-    }
+    res.status(201).json({ message: 'Account created. Awaiting admin approval.', token, user: { id: user._id, name: user.name, code: user.code, role: user.role, phone: user.phone, email: user.email, isApproved: user.isApproved } });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
-// Email verification
-router.get('/verify', async (req, res) => {
-  const { token } = req.query;
-  if (!token) return res.status(400).json({ message: 'Missing token' });
-  try {
-    const user = await User.findOne({ verifyToken: token });
-    if (!user) return res.status(400).json({ message: 'Invalid token' });
-    user.isVerified = true;
-    user.verifyToken = undefined;
-    await user.save();
-    res.json({ message: 'Account verified' });
-  } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
-  }
+// Email verification disabled
+router.get('/verify', (req, res) => {
+  res.status(410).json({ message: 'Verification not required. Contact admin for access.' });
 });
 
-// Forgot password: generate reset token and email it (or return token if SMTP not configured)
-router.post('/forgot', async (req, res) => {
-  let { email } = req.body;
-  if (!email) return res.status(400).json({ message: 'Missing email' });
-  email = String(email).trim().toLowerCase();
-  try {
-    const user = await User.findOne({ email });
-    if (!user) return res.status(200).json({ message: 'If that email exists, a reset link was sent' });
-
-    const resetToken = crypto.randomBytes(24).toString('hex');
-    user.resetPasswordToken = resetToken;
-    user.resetPasswordExpires = Date.now() + 3600 * 1000; // 1 hour
-    await user.save();
-
-    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset/${resetToken}`;
-    const message = `Reset your password: ${resetUrl}`;
-    try {
-      const info = await sendEmail({ to: email, subject: 'Password reset', text: message, html: `<p>${message}</p>` });
-      const resp = { message: 'Reset email sent' };
-      if (info && info.previewUrl) resp.previewUrl = info.previewUrl;
-      return res.json(resp);
-    } catch (e) {
-      // SMTP not configured — return token for testing
-      return res.json({ message: 'Reset token (no SMTP)', resetToken });
-    }
-  } catch (err) {
-    res.status(500).json({ message: 'Server error', error: err.message });
-  }
+// Forgot/reset disabled (admin resets passwords)
+router.post('/forgot', (req, res) => {
+  res.status(410).json({ message: 'Password reset is handled by admin.' });
 });
 
-// Reset password
-router.post('/reset', async (req, res) => {
-  const { token, password } = req.body;
-  if (!token || !password) return res.status(400).json({ message: 'Missing fields' });
+router.post('/reset', (req, res) => {
+  res.status(410).json({ message: 'Password reset is handled by admin.' });
+});
+
+// Admin reset password
+router.post('/admin-reset', verifyToken, requireRole('admin'), async (req, res) => {
+  let { code, userId, password } = req.body;
+  if (!password || (!code && !userId)) return res.status(400).json({ message: 'Missing fields' });
+
+  const pwCheck = validatePassword(password);
+  if (!pwCheck.valid) return res.status(400).json({ message: 'Weak password', errors: pwCheck.errors });
+
+  code = code ? String(code).trim().toLowerCase() : undefined;
+
   try {
-    const user = await User.findOne({ resetPasswordToken: token, resetPasswordExpires: { $gt: Date.now() } });
-    if (!user) return res.status(400).json({ message: 'Invalid or expired token' });
+    const user = code ? await User.findOne({ code }) : await User.findById(userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // Validate password strength on reset
-    const pwCheck = validatePassword(password);
-    if (!pwCheck.valid) return res.status(400).json({ message: 'Weak password', errors: pwCheck.errors });
-
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(password, salt);
+    user.password = await bcrypt.hash(password, 10);
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
     await user.save();
-
-    res.json({ message: 'Password reset successful' });
+    res.json({ message: 'Password reset' });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
-// Login
+// Login with code + password
 router.post('/login', async (req, res) => {
-  let { email, password } = req.body;
-  if (!email || !password) return res.status(400).json({ message: 'Missing fields' });
+  let { code, password } = req.body;
+  if (!code || !password) return res.status(400).json({ message: 'Missing fields' });
+
+  code = String(code).trim().toLowerCase();
 
   try {
-    email = String(email).trim().toLowerCase();
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ code });
     if (!user) return res.status(400).json({ message: 'Invalid credentials' });
 
     const isMatch = await bcrypt.compare(password, user.password);
@@ -155,7 +120,7 @@ router.post('/login', async (req, res) => {
 
     const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '8h' });
 
-    res.json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
+    res.json({ token, user: { id: user._id, name: user.name, code: user.code, role: user.role, phone: user.phone, email: user.email, isApproved: user.isApproved } });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }

@@ -1,90 +1,90 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import API from '../api'
-import { useNavigate } from 'react-router-dom'
 import { rules, validate as validatePw } from '../utils/passwordRules'
 import { useToast } from '../components/Toast'
 
 export default function SignupPage() {
   const [name, setName] = useState('')
+  const [code, setCode] = useState('')
+  const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [pwErrors, setPwErrors] = useState([])
   const [pwStatus, setPwStatus] = useState({ valid: false, unmet: [] })
+  const [codes, setCodes] = useState([])
   const [error, setError] = useState(null)
-  const navigate = useNavigate()
   const toast = useToast()
+
+  useEffect(() => {
+    API.get('/codes/available').then(res => setCodes(res.data)).catch(err => console.error(err))
+  }, [])
+
+  const onPasswordChange = (v) => {
+    setPassword(v)
+    const s = validatePw(v)
+    setPwStatus(s)
+  }
 
   const submit = async (e) => {
     e.preventDefault()
-    // Client-side validation (authoritative check before submit)
-    const client = validatePw(password)
-    setPwStatus(client)
-    if (!client.valid) {
-      setPwErrors(client.unmet.map(k => rules.find(r => r.key === k).label))
-      return
-    }
+    setError(null)
+    const check = validatePw(password)
+    setPwStatus(check)
+    if (!check.valid) return
 
     try {
-      const res = await API.post('/auth/signup', { name, email, password })
+      const res = await API.post('/auth/signup', { name, code, password, phone, email })
       localStorage.setItem('token', res.data.token)
       localStorage.setItem('user', JSON.stringify(res.data.user))
-      // If the server returned a previewUrl (Ethereal) or message, show it instead of immediately navigating
-      if (res.data.previewUrl || res.data.verifyToken) {
-        setInfo({ message: res.data.message, previewUrl: res.data.previewUrl, verifyToken: res.data.verifyToken })
-        return
-      }
-      // show toast and navigate
-      try { toast.show('Account created', 'success') } catch(e){}
-      navigate('/dashboard')
+      try { toast.show(res.data.message || 'Account created. Awaiting approval.', 'success') } catch (e) {}
+      window.location.href = '/waiting'
     } catch (err) {
       const msg = err?.response?.data?.message || 'Signup failed'
-      try { toast.show(msg, 'error') } catch(e){}
       setError(msg)
+      try { toast.show(msg, 'error') } catch (e) {}
     }
   }
 
-  const [info, setInfo] = React.useState(null)
-
-    function onPasswordChange(v) {
-      setPassword(v)
-      setPwErrors([])
-      const s = validatePw(v)
-      setPwStatus(s)
-    }
-
   return (
     <div className="max-w-md mx-auto mt-20 card">
-      <h2 className="text-2xl mb-4">Create account</h2>
+      <h2 className="text-2xl mb-4">Create Profile</h2>
       <form onSubmit={submit}>
         <div>
           <label className="block text-sm">Name</label>
-          <input value={name} onChange={e=>setName(e.target.value)} />
+          <input value={name} onChange={e => setName(e.target.value)} />
         </div>
-        <div>
-          <label className="block text-sm">Email</label>
-          <input value={email} onChange={e=>setEmail(e.target.value)} />
+        <div className="mt-3">
+          <label className="block text-sm">Division Code</label>
+          <select value={code} onChange={e => setCode(e.target.value)} className="w-full border p-2 rounded mt-1">
+            <option value="">Select code</option>
+            {codes.map(c => (
+              <option key={c.code} value={c.code}>{c.code}{c.label ? ` — ${c.label}` : ''} ({c.role || 'user'})</option>
+            ))}
+          </select>
+          <div className="text-xs text-gray-600 mt-1">Codes are provisioned by admin. Only unused codes appear.</div>
         </div>
-        <div>
+        <div className="mt-3">
+          <label className="block text-sm">Phone (WhatsApp)</label>
+          <input value={phone} onChange={e => setPhone(e.target.value)} />
+        </div>
+        <div className="mt-3">
+          <label className="block text-sm">Email (admin notifications only, optional)</label>
+          <input value={email} onChange={e => setEmail(e.target.value)} />
+        </div>
+        <div className="mt-3">
           <label className="block text-sm">Password</label>
-          <input type="password" value={password} onChange={e=>onPasswordChange(e.target.value)} />
+          <input type="password" value={password} onChange={e => onPasswordChange(e.target.value)} />
           <div className="mt-2 text-sm">
             {rules.map(r => (
-              <div key={r.key} className={pwStatus.unmet.includes(r.key) ? 'text-red-600' : 'text-green-600'}>
-                {pwStatus.unmet.includes(r.key) ? '✖' : '✓'} {r.label}
+              <div key={r.key} className={pwStatus.unmet?.includes(r.key) ? 'text-red-600' : 'text-green-600'}>
+                {pwStatus.unmet?.includes(r.key) ? '✖' : '✓'} {r.label}
               </div>
             ))}
           </div>
         </div>
-        {error && <div className="text-red-600">{error}</div>}
-        {info && (
-          <div className="mb-3">
-            <div className="text-green-600">{info.message}</div>
-            {info.previewUrl && <div className="mt-2"><a className="text-blue-600" target="_blank" rel="noreferrer" href={info.previewUrl}>Open email preview</a></div>}
-            {info.verifyToken && <div className="mt-2 text-sm">Verify Token: <code>{info.verifyToken}</code></div>}
-          </div>
-        )}
-        <button className="mt-3 btn" type="submit">Create account</button>
+        {error && <div className="text-red-600 mt-2">{error}</div>}
+        <button className="mt-4 btn" type="submit">Submit</button>
       </form>
+      <div className="mt-3 text-sm text-gray-700">After submitting, an admin must approve your account. Until then you will be placed in the waiting area.</div>
     </div>
   )
 }

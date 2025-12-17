@@ -8,6 +8,7 @@ const router = express.Router();
 const Report = require('../models/Report');
 const ReportAccess = require('../models/ReportAccess');
 const User = require('../models/User');
+const { notifyReportUpload } = require('../utils/whatsapp');
 const { verifyToken, requireRole } = require('../middleware/authMiddleware');
 const fs = require('fs');
 const { promisify } = require('util');
@@ -109,6 +110,11 @@ router.post('/', verifyToken, requireRole('admin'), upload.single('file'), async
 
     const accessRecords = parsedUserIds.map((uid) => ({ reportId: report._id, userId: uid }));
     if (accessRecords.length) await ReportAccess.insertMany(accessRecords);
+
+    if (parsedUserIds.length) {
+      const assignedUsers = await User.find({ _id: { $in: parsedUserIds } }).select('name phone code email');
+      notifyReportUpload({ report, users: assignedUsers }).catch(err => console.error('whatsapp notify failed', err.message));
+    }
 
     res.status(201).json({ message: 'Report uploaded', report });
   } catch (err) {

@@ -10,6 +10,7 @@ import AdminUsers from './pages/AdminUsers'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import VerifyPage from './pages/VerifyPage'
+import WaitingPage from './pages/WaitingPage'
 import UserSettings from './pages/UserSettings'
 import Navbar from './components/Navbar'
 import ToastProvider from './components/Toast'
@@ -31,6 +32,7 @@ createRoot(document.getElementById('root')).render(
           <Route path='/forgot' element={<ForgotPassword />} />
           <Route path='/reset/:token' element={<ResetPassword />} />
           <Route path='/verify' element={<VerifyPage />} />
+          <Route path='/waiting' element={<WaitingPage />} />
           <Route path='/dashboard' element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path='/settings' element={<ProtectedRoute><UserSettings /></ProtectedRoute>} />
           <Route path='/upload' element={<AdminRoute><UploadPage /></AdminRoute>} />
