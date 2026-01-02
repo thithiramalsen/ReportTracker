@@ -24,30 +24,16 @@ export default function OpenNext(){
 
     // If next points to our API (contains /api), fetch via API (which adds Authorization)
     try {
-      if (next.startsWith(apiBase)) {
-        const path = next.slice(apiBase.length) || '/'
-        setStatus('Fetching file...')
-        API.get(path, { responseType: 'blob' }).then(resp => openBlob(resp.data, resp.data.type)).catch(err => {
-          console.error('OpenNext fetch failed', err)
-          try{ toast.show('Failed to open file', 'error') }catch(e){}
-          setStatus('Failed to open file')
-        })
-        return
-      }
-
-      if (next.startsWith('/api/')) {
-        const path = next.replace(/^\/api/, '')
-        setStatus('Fetching file...')
-        API.get(path, { responseType: 'blob' }).then(resp => openBlob(resp.data, resp.data.type)).catch(err => {
-          console.error('OpenNext fetch failed', err)
-          try{ toast.show('Failed to open file', 'error') }catch(e){}
-          setStatus('Failed to open file')
-        })
+      // Avoid XHR to S3 presigned URLs (CORS). Open backend download URL in new tab so browser navigation follows redirect.
+      if (next.startsWith(apiBase) || next.startsWith('/api/')) {
+        const full = next.startsWith(apiBase) ? next : `${apiBase}${next.replace(/^\/api/, '')}`
+        setStatus('Opening file in new tab...')
+        window.open(full, '_blank')
         return
       }
 
       // otherwise navigate directly (S3 or external link)
-      window.location.href = next
+      window.open(next, '_blank')
     } catch (e) {
       console.error('OpenNext error', e)
       navigate('/dashboard')
