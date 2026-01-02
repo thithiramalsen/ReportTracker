@@ -6,6 +6,7 @@ import { useToast } from '../components/Toast'
 export default function Notifications(){
   const [list, setList] = useState([])
   const toast = useToast()
+  const apiBase = (import.meta.env.VITE_API_BASE || 'http://localhost:5000/api').replace(/\/$/, '')
 
   const openReportByUrl = async (url) => {
     // Open download URL in a new tab to avoid S3 CORS issues (backend redirects to presigned URL)
@@ -26,6 +27,22 @@ export default function Notifications(){
     } catch (err) {
       console.error('openReportByUrl error', err)
       try { toast.show('Failed to open report', 'error') } catch(e){}
+    }
+  }
+
+  const copyReportLink = async (url) => {
+    try {
+      if (!url) throw new Error('no url')
+      const full = url.startsWith('http')
+        ? url
+        : url.startsWith('/api/')
+          ? `${apiBase}${url.replace(/^\/api/, '')}`
+          : `${apiBase}${url.startsWith('/') ? url : '/' + url}`
+      await navigator.clipboard.writeText(full)
+      try { toast.show('Link copied', 'success') } catch(e){}
+    } catch (err) {
+      console.error('copyReportLink error', err)
+      try { toast.show('Failed to copy link', 'error') } catch(e){}
     }
   }
 
@@ -76,7 +93,12 @@ export default function Notifications(){
                 <div>
                   <div className="font-medium">{n.message}</div>
                   <div className="text-sm text-gray-600 mt-1">{new Date(n.createdAt).toLocaleString()}</div>
-                  {n.data?.downloadUrl && (<div className="mt-2"><button className="text-blue-600" onClick={()=> openReportByUrl(n.data.downloadUrl)}>Open report</button></div>)}
+                  {n.data?.downloadUrl && (
+                    <div className="mt-2 flex gap-3 items-center">
+                      <button className="text-blue-600" onClick={()=> openReportByUrl(n.data.downloadUrl)}>Open report</button>
+                      <button className="text-sm text-gray-600 underline" onClick={()=> copyReportLink(n.data.downloadUrl)}>Copy link</button>
+                    </div>
+                  )}
                 </div>
                 <div>
                   {!n.read && <button className="px-2 py-1 bg-green-600 text-white rounded" onClick={()=>markRead(n._id)}>Mark read</button>}

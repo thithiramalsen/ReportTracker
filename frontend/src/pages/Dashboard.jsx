@@ -3,14 +3,26 @@ import API from '../api'
 import { FileText, Eye } from 'lucide-react'
 
 function ReportCard({ r }) {
+  const apiBase = (import.meta.env.VITE_API_BASE || 'http://localhost:5000/api').replace(/\/$/, '')
+
   const openReport = async (id) => {
     try {
-      const base = (import.meta.env.VITE_API_BASE || 'http://localhost:5000/api').replace(/\/$/, '')
-      const full = `${base}/reports/${id}/download`
+      const full = `${apiBase}/reports/${id}/download`
       window.open(full, '_blank')
     } catch (err) {
       console.error(err)
       alert('Unable to open report')
+    }
+  }
+
+  const copyLink = async (id) => {
+    try {
+      const full = `${apiBase}/reports/${id}/download`
+      await navigator.clipboard.writeText(full)
+      alert('Link copied')
+    } catch (err) {
+      console.error('copy failed', err)
+      alert('Failed to copy link')
     }
   }
 
@@ -19,7 +31,10 @@ function ReportCard({ r }) {
       <h4 className="text-lg font-semibold">{r.title}</h4>
       <div className="text-sm text-gray-600">{r.description}</div>
       <div className="text-sm text-gray-500">{new Date(r.reportDate).toLocaleDateString()}</div>
-      <button onClick={() => openReport(r._id)} className="text-blue-600 inline-flex items-center gap-2"><Eye className="w-4 h-4"/>View PDF</button>
+      <div className="flex items-center gap-3">
+        <button onClick={() => openReport(r._id)} className="text-blue-600 inline-flex items-center gap-2"><Eye className="w-4 h-4"/>View PDF</button>
+        <button onClick={() => copyLink(r._id)} className="text-sm text-gray-600 underline">Copy link</button>
+      </div>
     </div>
   )
 }
