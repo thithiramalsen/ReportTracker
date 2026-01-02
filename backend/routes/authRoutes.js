@@ -26,12 +26,15 @@ router.post('/register', verifyToken, requireRole('admin'), async (req, res) => 
     if (!pwCheck.valid) return res.status(400).json({ message: 'Weak password', errors: pwCheck.errors });
 
     const hash = await bcrypt.hash(password, 10);
-    const user = new User({ name, code, password: hash, role: role || 'user', phone, email });
+    const userData = { name, code, password: hash, role: role || 'user', phone };
+    if (email) userData.email = email;
+    const user = new User(userData);
     await user.save();
 
     res.status(201).json({ message: 'User created', user: { id: user._id, name: user.name, code: user.code, role: user.role, phone: user.phone, email: user.email, isApproved: user.isApproved } });
   } catch (err) {
-    console.error('[AUTH][SIGNUP] error:', err && err.stack ? err.stack : err);
+    if (err && err.code === 11000) return res.status(400).json({ message: 'Duplicate value exists (email or code). Contact admin.' });
+    console.error('[AUTH][REGISTER] error:', err && err.stack ? err.stack : err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -55,8 +58,19 @@ router.post('/signup', async (req, res) => {
     if (!pwCheck.valid) return res.status(400).json({ message: 'Weak password', errors: pwCheck.errors });
 
     const hash = await bcrypt.hash(password, 10);
-    const user = new User({ name, code, password: hash, role: slot.role || 'user', phone, email, isApproved: false });
-    await user.save();
+    const userData = { name, code, password: hash, role: slot.role || 'user', phone, isApproved: false };
+    if (email) userData.email = email;
+    const user = new User(userData);
+    try {
+      await user.save();
+    } catch (saveErr) {
+      if (saveErr && saveErr.code === 11000) {
+        // duplicate key (likely email null/index) -> friendly error
+        console.error('[AUTH][SIGNUP] duplicate key on save', saveErr.message);
+        return res.status(400).json({ message: 'Duplicate value exists (email or code). Contact admin.' });
+      }
+      throw saveErr;
+    }
 
     slot.usedBy = user._id;
     await slot.save();
@@ -150,8 +164,18 @@ router.post('/login', async (req, res) => {
 
     const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '8h' });
 
-    res.json({ token, user: { id: user._id, name: user.name, code: user.code, role: user.role, phone: user.phone, email: user.email, isApproved: user.isApproved } });
+    let loginToken = null;
+    try {
+      if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET not configured');
+      loginToken = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '8h' });
+    } catch (e) {
+      console.error('[AUTH][LOGIN] token generation failed', e && e.stack ? e.stack : e);
+      return res.status(500).json({ message: 'Server error', error: 'Auth system not configured' });
+    }
+
+    res.json({ token: loginToken, user: { id: user._id, name: user.name, code: user.code, role: user.role, phone: user.phone, email: user.email, isApproved: user.isApproved } });
   } catch (err) {
+    if (err && err.code === 11000) return res.status(400).json({ message: 'Duplicate value exists (email or code). Contact admin.' });
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
