@@ -78,6 +78,7 @@ export default function UploadPage() {
 
   const openBlob = async (id, asDownload = false) => {
     try {
+      console.log('[UI] download token', localStorage.getItem('token'))
       const resp = await API.get(`/reports/${id}/download`, { responseType: 'blob' })
       const blob = new Blob([resp.data], { type: resp.data.type || 'application/pdf' })
       const url = window.URL.createObjectURL(blob)

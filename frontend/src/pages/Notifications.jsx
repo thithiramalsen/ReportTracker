@@ -20,6 +20,7 @@ export default function Notifications(){
       if (url.startsWith('/api/')) {
         path = url.replace(/^\/api/, '')
       }
+      console.log('[UI] download token', localStorage.getItem('token'))
       const resp = await API.get(path, { responseType: 'blob' })
       const blob = new Blob([resp.data], { type: (resp.data && resp.data.type) || 'application/pdf' })
       const u = window.URL.createObjectURL(blob)
