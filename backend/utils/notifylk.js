@@ -4,6 +4,8 @@ const enabled = process.env.NOTIFYLK_ENABLED === 'true';
 const userId = process.env.NOTIFYLK_USER_ID;
 const apiKey = process.env.NOTIFYLK_API_KEY;
 const senderId = process.env.NOTIFYLK_SENDER_ID || 'NotifyDEMO';
+const SmsJob = require('../models/SmsJob');
+const MAX_ATTEMPTS = parseInt(process.env.NOTIFYLK_MAX_ATTEMPTS || '5', 10);
 
 function normalizePhoneForNotifyLK(raw) {
   if (!raw) return '';
@@ -50,6 +52,54 @@ async function sendSms({ to, message, contact }) {
   }
 }
 
+// Create a persisted job for sending SMS. Useful for retries and admin visibility.
+async function enqueueSmsJob({ to, message, contact, meta }) {
+  if (!to) throw new Error('Missing recipient phone');
+  const job = new SmsJob({ to, message, contact, meta, status: 'pending', attempts: 0 });
+  await job.save();
+  return job;
+}
+
+// Attempt to process a single job (one-off). Returns job after update.
+async function processJob(job) {
+  if (!job || job.status === 'sent' || job.status === 'resolved') return job;
+  try {
+    const resp = await sendSms({ to: job.to, message: job.message, contact: job.contact });
+    job.attempts = (job.attempts || 0) + 1;
+    job.status = 'sent';
+    job.lastTriedAt = new Date();
+    job.lastError = undefined;
+    job.providerResponse = resp;
+    // Try to capture common provider id fields
+    if (resp) {
+      if (resp.sid) job.providerMessageId = resp.sid;
+      else if (resp.data && resp.data.message_id) job.providerMessageId = resp.data.message_id;
+      else if (resp.message_id) job.providerMessageId = resp.message_id;
+      else if (resp.data && resp.data.data) {
+        // notify.lk returns { status: 'success', data: 'Sent' } - no id
+      }
+    }
+    await job.save();
+    return job;
+  } catch (err) {
+    job.attempts = (job.attempts || 0) + 1;
+    job.lastTriedAt = new Date();
+    job.lastError = err && err.message ? err.message : String(err);
+    job.status = job.attempts >= MAX_ATTEMPTS ? 'failed' : 'pending';
+    await job.save();
+    return job;
+  }
+}
+
+// Process pending jobs in batch (limit configurable)
+async function processPendingJobs(limit = 10) {
+  const q = { status: { $in: ['pending','failed'] }, attempts: { $lt: MAX_ATTEMPTS } };
+  const jobs = await SmsJob.find(q).sort({ createdAt: 1 }).limit(limit);
+  for (const j of jobs) {
+    try { await processJob(j); } catch(e) { console.error('processJob failed', e.message || e); }
+  }
+}
+
 async function notifyReportUpload({ report, users }) {
   if (!users || !users.length) return;
 
@@ -57,23 +107,22 @@ async function notifyReportUpload({ report, users }) {
   const downloadPath = `/api/reports/${report._id}/download`;
   const downloadUrl = base ? `${base.replace(/\/$/, '')}${downloadPath}` : downloadPath;
 
-  const jobs = users
-    .filter(u => u && u.phone)
-    .map(u => {
-      const to = normalizePhoneForNotifyLK(u.phone);
-      const name = u.name || '';
-      const text = `${name ? `Hi ${name}, ` : 'Hi, '}a new report "${report.title || 'report'}" is ready. Open: ${downloadUrl}`;
-      const contact = { firstName: u.name || '', email: u.email || '' };
-      return sendSms({ to, message: text, contact }).catch(err => {
-        console.error('[notifylk] individual send failed', err.message || err.toString());
-      });
-    });
-
-  try {
-    await Promise.all(jobs);
-  } catch (e) {
-    console.error('[notifylk] some sends failed', e && e.message ? e.message : e);
+  // enqueue jobs for persistence and retries
+  const created = [];
+  for (const u of users.filter(u=>u && u.phone)) {
+    const to = normalizePhoneForNotifyLK(u.phone);
+    const name = u.name || '';
+    const text = `${name ? `Hi ${name}, ` : 'Hi, '}a new report "${report.title || 'report'}" is ready. Open: ${downloadUrl}`;
+    const contact = { firstName: u.name || '', email: u.email || '' };
+    try {
+      const job = await enqueueSmsJob({ to, message: text, contact, meta: { reportId: String(report._id) } });
+      created.push(job);
+    } catch (err) { console.error('[notifylk] enqueue failed', err && err.message ? err.message : err); }
   }
+
+  // trigger immediate processing in background (non-blocking)
+  processPendingJobs().catch(e => console.error('[notifylk] background process failed', e && e.message ? e.message : e));
+  return created;
 }
 
-module.exports = { sendSms, notifyReportUpload };
+module.exports = { sendSms, notifyReportUpload, enqueueSmsJob, processPendingJobs, processJob };

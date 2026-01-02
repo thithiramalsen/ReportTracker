@@ -12,6 +12,8 @@ const reportRoutes = require('./routes/reportRoutes');
 const userRoutes = require('./routes/userRoutes');
 const codeRoutes = require('./routes/codeRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const notifyJobsRoutes = require('./routes/notifyJobs');
+const notifylk = require('./utils/notifylk');
 
 const app = express();
 app.use(cors());
@@ -32,6 +34,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/codes', codeRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/notify', notifyJobsRoutes);
 
 // Health
 app.get('/api/health', (req, res) => res.json({ ok: true }));
@@ -49,6 +52,14 @@ mongoose
   .then(() => {
     console.log('MongoDB connected');
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    // Start background processor for pending SMS jobs
+    try {
+      const intervalMs = parseInt(process.env.NOTIFYLK_PROCESS_INTERVAL_MS || '60000', 10);
+      setInterval(() => {
+        notifylk.processPendingJobs().catch(e => console.error('notifylk background error', e && e.message ? e.message : e));
+      }, intervalMs);
+      console.log('Started notifylk background processor, intervalMs=', process.env.NOTIFYLK_PROCESS_INTERVAL_MS || 60000);
+    } catch (e) { console.error('Failed to start notifylk processor', e.message || e); }
   })
   .catch((err) => {
     console.error('MongoDB connection error:', err.message);
