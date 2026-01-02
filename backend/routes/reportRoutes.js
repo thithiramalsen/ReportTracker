@@ -313,7 +313,7 @@ router.get('/:id/download', async (req, res) => {
         // If request from browser, show friendly page instead of raw JSON
         if (acceptsHtml) {
           const frontend = process.env.APP_BASE_URL ? process.env.APP_BASE_URL.replace(/\/$/, '') : '';
-          const loginPath = '/login';
+          const loginPath = '/auth/login';
           const message = `File is not available on the server. Please log in to access or contact admin.`;
           // simple HTML response directing to login
           const loginUrl = frontend ? `${frontend}${loginPath}` : loginPath;
