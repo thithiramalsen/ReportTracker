@@ -158,6 +158,7 @@ router.post('/', verifyToken, requireRole('admin'), upload.single('file'), async
 
     res.status(201).json({ message: 'Report uploaded', report });
   } catch (err) {
+    console.error('[REPORTS][UPLOAD] error:', err && err.stack ? err.stack : err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -218,6 +219,7 @@ router.get('/:id/download', verifyToken, async (req, res) => {
     // fallback: redirect to url
     return res.redirect(url);
   } catch (err) {
+    console.error('[REPORTS][DOWNLOAD] error:', err && err.stack ? err.stack : err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
