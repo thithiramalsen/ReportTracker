@@ -41,27 +41,12 @@ async function sendSms({ to, message, contact }) {
     if (contact.address) params.contact_address = contact.address;
   }
 
-  // retry/backoff
-  const maxRetries = parseInt(process.env.NOTIFYLK_MAX_RETRIES || '2', 10);
-  const baseDelay = parseInt(process.env.NOTIFYLK_RETRY_BASE_MS || '1000', 10);
-
-  const sleep = (ms) => new Promise(res => setTimeout(res, ms));
-
-  let attempt = 0;
-  while (attempt <= maxRetries) {
-    try {
-      const resp = await axios.get(url, { params, timeout: 10000 });
-      return resp.data;
-    } catch (err) {
-      attempt += 1;
-      const msg = err && err.message ? err.message : String(err);
-      console.error(`[notifylk] send failed attempt ${attempt}/${maxRetries + 1}:`, msg);
-      if (attempt > maxRetries) {
-        throw err;
-      }
-      const delay = baseDelay * Math.pow(2, attempt - 1);
-      await sleep(delay);
-    }
+  try {
+    const resp = await axios.get(url, { params });
+    return resp.data;
+  } catch (err) {
+    console.error('[notifylk] send failed', err.message || err.toString());
+    throw err;
   }
 }
 
