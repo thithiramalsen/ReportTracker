@@ -8,25 +8,23 @@ export default function Notifications(){
   const toast = useToast()
 
   const openReportByUrl = async (url) => {
-    // normalize URL: API.baseURL already includes '/api', so strip leading '/api' to avoid duplication
-    let path = url
+    // Open download URL in a new tab to avoid S3 CORS issues (backend redirects to presigned URL)
     try {
       if (!url) throw new Error('no url')
+      const base = (import.meta.env.VITE_API_BASE || 'http://localhost:5000/api').replace(/\/$/, '')
       if (url.startsWith('http://') || url.startsWith('https://')) {
-        path = url
-      } else if (url.startsWith('/api/')) {
-        path = url.replace(/^\/api/, '')
+        window.open(url, '_blank')
+        return
       }
-    } catch (err) { console.error('openReportByUrl - invalid url', err); try { toast.show('Invalid report URL', 'error') } catch(e){}; return }
-
-    try {
-      const resp = await API.get(path, { responseType: 'blob' })
-      const blob = new Blob([resp.data], { type: (resp.data && resp.data.type) || 'application/pdf' })
-      const u = window.URL.createObjectURL(blob)
-      window.open(u, '_blank')
-      setTimeout(() => window.URL.revokeObjectURL(u), 10000)
+      if (url.startsWith('/api/')) {
+        const full = `${base}${url.replace(/^\/api/, '')}`
+        window.open(full, '_blank')
+        return
+      }
+      // fallback: treat as relative to api
+      window.open(`${base}${url.startsWith('/') ? url : '/' + url}`, '_blank')
     } catch (err) {
-      console.error('failed to fetch report blob', err)
+      console.error('openReportByUrl error', err)
       try { toast.show('Failed to open report', 'error') } catch(e){}
     }
   }

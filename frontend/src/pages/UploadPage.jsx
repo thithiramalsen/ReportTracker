@@ -78,21 +78,20 @@ export default function UploadPage() {
 
   const openBlob = async (id, asDownload = false) => {
     try {
-      const resp = await API.get(`/reports/${id}/download`, { responseType: 'blob' })
-      const blob = new Blob([resp.data], { type: resp.data.type || 'application/pdf' })
-      const url = window.URL.createObjectURL(blob)
+      const base = (import.meta.env.VITE_API_BASE || 'http://localhost:5000/api').replace(/\/$/, '')
+      const full = `${base}/reports/${id}/download`
+      // open in new tab; backend will redirect to presigned S3 URL
       if (asDownload) {
+        // create temporary anchor to trigger download/navigation
         const a = document.createElement('a')
-        a.href = url
-        a.download = 'report.pdf'
+        a.href = full
+        a.target = '_blank'
         document.body.appendChild(a)
         a.click()
         a.remove()
       } else {
-        window.open(url, '_blank')
+        window.open(full, '_blank')
       }
-      // release URL after a bit
-      setTimeout(() => window.URL.revokeObjectURL(url), 10000)
     } catch (err) {
       console.error(err)
       try { toast.show('Unable to download file', 'error') } catch(e){}
