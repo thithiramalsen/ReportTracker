@@ -241,7 +241,7 @@ router.get('/:id/download', async (req, res) => {
     if (!user) {
       if (acceptsHtml) {
         const frontend = process.env.APP_BASE_URL ? process.env.APP_BASE_URL.replace(/\/$/, '') : '';
-        const loginPath = '/auth/login';
+        const loginPath = '/login';
         const currentUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
         const redirectTo = frontend ? `${frontend}${loginPath}?next=${encodeURIComponent(currentUrl)}` : `${loginPath}?next=${encodeURIComponent(currentUrl)}`;
         console.log('[REPORTS][DOWNLOAD] unauthenticated browser request - redirecting to', redirectTo);
