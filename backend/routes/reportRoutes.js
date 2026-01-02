@@ -1,8 +1,9 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
-const { S3Client } = require('@aws-sdk/client-s3');
+const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { Upload } = require('@aws-sdk/lib-storage');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 const router = express.Router();
 const Report = require('../models/Report');
@@ -61,6 +62,20 @@ if (awsBucket && process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_
       } else cb(null, true);
     }
   });
+}
+
+// helper to extract object key from an S3 URL that looks like https://bucket.s3.region.amazonaws.com/key
+function extractS3Key(url) {
+  try {
+    const u = new URL(url);
+    // pathname starts with /key...
+    let key = u.pathname;
+    if (key.startsWith('/')) key = key.slice(1);
+    return decodeURIComponent(key);
+  } catch (e) {
+    console.error('[REPORTS][S3] failed to parse url', url, e.message);
+    return null;
+  }
 }
 
 // POST /api/reports - admin only -> upload PDF + assign users
@@ -237,8 +252,15 @@ router.get('/:id/download', async (req, res) => {
     if (!url) return res.status(404).json({ message: 'File not available' });
 
     if (useS3 && url.startsWith('http')) {
-      // redirect to S3 URL (assumes public)
-      return res.redirect(url);
+      const objectKey = extractS3Key(url);
+      if (!objectKey) return res.status(500).json({ message: 'Invalid file URL' });
+      try {
+        const signedUrl = await getSignedUrl(s3Client, new GetObjectCommand({ Bucket: awsBucket, Key: objectKey }), { expiresIn: 600 });
+        return res.redirect(signedUrl);
+      } catch (e) {
+        console.error('[REPORTS][DOWNLOAD][S3] presign failed', e.message || e);
+        return res.status(500).json({ message: 'Unable to generate download link' });
+      }
     }
 
     // local file
