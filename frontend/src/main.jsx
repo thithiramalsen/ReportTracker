@@ -11,6 +11,7 @@ import AdminCodes from './pages/AdminCodes'
 import AdminNotifyJobs from './pages/AdminNotifyJobs'
 import AdminNotifyAnalytics from './pages/AdminNotifyAnalytics'
 import Notifications from './pages/Notifications'
+import OpenNext from './pages/OpenNext'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import VerifyPage from './pages/VerifyPage'
@@ -39,6 +40,7 @@ createRoot(document.getElementById('root')).render(
           <Route path='/waiting' element={<WaitingPage />} />
           <Route path='/dashboard' element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path='/settings' element={<ProtectedRoute><UserSettings /></ProtectedRoute>} />
+          <Route path='/open' element={<OpenNext />} />
           <Route path='/upload' element={<AdminRoute><UploadPage /></AdminRoute>} />
           <Route path='/admin/users' element={<AdminRoute><AdminUsers /></AdminRoute>} />
           <Route path='/admin/codes' element={<AdminRoute><AdminCodes /></AdminRoute>} />

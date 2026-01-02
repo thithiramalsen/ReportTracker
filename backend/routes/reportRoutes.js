@@ -11,6 +11,7 @@ const User = require('../models/User');
 const { notifyReportUpload: notifyWhatsApp } = require('../utils/whatsapp');
 const { notifyReportUpload: notifySms } = require('../utils/notifylk');
 const { verifyToken, requireRole } = require('../middleware/authMiddleware');
+const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const { promisify } = require('util');
 const unlinkAsync = promisify(fs.unlink);
@@ -189,18 +190,50 @@ router.get('/', verifyToken, async (req, res) => {
 });
 
 // GET /api/reports/:id/download - allow admin or assigned users to download
-router.get('/:id/download', verifyToken, async (req, res) => {
+// Behavior: If request is from a browser (Accept: text/html) and unauthenticated,
+// redirect to frontend login page with `next` param. For API/XHR requests, return JSON 401/403 as before.
+router.get('/:id/download', async (req, res) => {
   try {
+    // Attempt to authenticate from Authorization header (Bearer token)
+    let user = null;
+    try {
+      const auth = req.headers.authorization;
+      if (auth && auth.startsWith('Bearer ')) {
+        const token = auth.split(' ')[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        user = { id: decoded.id, role: decoded.role };
+      }
+    } catch (e) {
+      // token invalid/expired - treat as unauthenticated
+      console.warn('[REPORTS][DOWNLOAD] token invalid or expired');
+      user = null;
+    }
+
+    // If unauthenticated and request looks like a browser navigation, redirect to login
+    const acceptsHtml = req.headers.accept && req.headers.accept.indexOf('text/html') !== -1;
+    if (!user) {
+      if (acceptsHtml) {
+        const frontend = process.env.APP_BASE_URL ? process.env.APP_BASE_URL.replace(/\/$/, '') : '';
+        const loginPath = '/auth/login';
+        const currentUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+        const redirectTo = frontend ? `${frontend}${loginPath}?next=${encodeURIComponent(currentUrl)}` : `${loginPath}?next=${encodeURIComponent(currentUrl)}`;
+        console.log('[REPORTS][DOWNLOAD] unauthenticated browser request - redirecting to', redirectTo);
+        return res.redirect(302, redirectTo);
+      }
+      return res.status(401).json({ message: 'No token provided' });
+    }
+
+    // fetch report and perform access check
     const report = await Report.findById(req.params.id);
     if (!report) return res.status(404).json({ message: 'Report not found' });
 
-    // Check access
-    if (req.user.role !== 'admin') {
-      const access = await ReportAccess.findOne({ reportId: report._id, userId: req.user.id });
+    if (user.role !== 'admin') {
+      const access = await ReportAccess.findOne({ reportId: report._id, userId: user.id });
       if (!access) return res.status(403).json({ message: 'Not authorized to access this report' });
     }
 
     const url = report.fileUrl;
+    console.log('[REPORTS][DOWNLOAD] report', report._id, 'fileUrl=', url);
     if (!url) return res.status(404).json({ message: 'File not available' });
 
     if (useS3 && url.startsWith('http')) {
@@ -212,7 +245,20 @@ router.get('/:id/download', verifyToken, async (req, res) => {
     if (url.startsWith('/uploads/')) {
       const filename = url.replace('/uploads/', '');
       const filePath = path.join(__dirname, '..', 'uploads', filename);
-      if (!fs.existsSync(filePath)) return res.status(404).json({ message: 'File missing on server' });
+      const exists = fs.existsSync(filePath);
+      console.log('[REPORTS][DOWNLOAD] local filePath=', filePath, 'exists=', exists);
+      if (!exists) {
+        // If request from browser, show friendly page instead of raw JSON
+        if (acceptsHtml) {
+          const frontend = process.env.APP_BASE_URL ? process.env.APP_BASE_URL.replace(/\/$/, '') : '';
+          const loginPath = '/auth/login';
+          const message = `File is not available on the server. Please log in to access or contact admin.`;
+          // simple HTML response directing to login
+          const loginUrl = frontend ? `${frontend}${loginPath}` : loginPath;
+          return res.status(404).send(`<html><body><h3>${message}</h3><p><a href="${loginUrl}">Log in</a></p></body></html>`);
+        }
+        return res.status(404).json({ message: 'File missing on server' });
+      }
       return res.download(filePath);
     }
 
