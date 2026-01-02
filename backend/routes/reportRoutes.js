@@ -220,9 +220,11 @@ router.get('/:id/download', async (req, res) => {
   try {
     // Attempt to authenticate from Authorization header (Bearer token)
     let user = null;
+    let hasAuthHeader = false;
     try {
       const auth = req.headers.authorization;
       if (auth && auth.startsWith('Bearer ')) {
+        hasAuthHeader = true;
         const token = auth.split(' ')[1];
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         user = { id: decoded.id, role: decoded.role };
@@ -233,19 +235,19 @@ router.get('/:id/download', async (req, res) => {
       user = null;
     }
 
-    // If unauthenticated and request looks like a browser navigation, redirect to login
     const acceptsHtml = req.headers.accept && req.headers.accept.indexOf('text/html') !== -1;
-    if (!user) {
-      if (acceptsHtml) {
-        const frontend = process.env.APP_BASE_URL ? process.env.APP_BASE_URL.replace(/\/$/, '') : '';
-        const loginPath = '/auth/login';
-        const currentUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
-        const redirectTo = frontend ? `${frontend}${loginPath}?next=${encodeURIComponent(currentUrl)}` : `${loginPath}?next=${encodeURIComponent(currentUrl)}`;
-        console.log('[REPORTS][DOWNLOAD] unauthenticated browser request - redirecting to', redirectTo);
-        return res.redirect(302, redirectTo);
-      }
-      return res.status(401).json({ message: 'No token provided' });
+    const isBrowserNav = acceptsHtml || !hasAuthHeader;
+
+    // If unauthenticated and this looks like a browser navigation, redirect to login with next
+    if (!user && isBrowserNav) {
+      const frontend = process.env.APP_BASE_URL ? process.env.APP_BASE_URL.replace(/\/$/, '') : '';
+      const loginPath = '/auth/login';
+      const currentUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+      const redirectTo = frontend ? `${frontend}${loginPath}?next=${encodeURIComponent(currentUrl)}` : `${loginPath}?next=${encodeURIComponent(currentUrl)}`;
+      console.log('[REPORTS][DOWNLOAD] unauthenticated browser request - redirecting to', redirectTo);
+      return res.redirect(302, redirectTo);
     }
+    if (!user) return res.status(401).json({ message: 'No token provided' });
 
     // fetch report and perform access check
     const report = await Report.findById(req.params.id);
@@ -253,7 +255,17 @@ router.get('/:id/download', async (req, res) => {
 
     if (user.role !== 'admin') {
       const access = await ReportAccess.findOne({ reportId: report._id, userId: user.id });
-      if (!access) return res.status(403).json({ message: 'Not authorized to access this report' });
+      if (!access) {
+        if (isBrowserNav) {
+          const frontend = process.env.APP_BASE_URL ? process.env.APP_BASE_URL.replace(/\/$/, '') : '';
+          const loginPath = '/auth/login';
+          const currentUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+          const redirectTo = frontend ? `${frontend}${loginPath}?next=${encodeURIComponent(currentUrl)}` : `${loginPath}?next=${encodeURIComponent(currentUrl)}`;
+          console.log('[REPORTS][DOWNLOAD] forbidden for user, redirecting to login', { user: user.id, reportId: String(report._id) });
+          return res.redirect(302, redirectTo);
+        }
+        return res.status(403).json({ message: 'Not authorized to access this report' });
+      }
     }
 
     const url = report.fileUrl;
