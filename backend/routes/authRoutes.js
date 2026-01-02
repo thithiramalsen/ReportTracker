@@ -8,6 +8,7 @@ const User = require('../models/User');
 const { verifyToken, requireRole } = require('../middleware/authMiddleware');
 const { validatePassword } = require('../utils/password');
 const CodeSlot = require('../models/CodeSlot');
+const Notification = require('../models/Notification');
 
 // Admin creates users (code + password)
 router.post('/register', verifyToken, requireRole('admin'), async (req, res) => {
@@ -58,6 +59,22 @@ router.post('/signup', async (req, res) => {
 
     slot.usedBy = user._id;
     await slot.save();
+
+    // notify admins about new signup
+    try {
+      const admins = await User.find({ role: 'admin' }).select('_id');
+      if (admins && admins.length) {
+        const notifs = admins.map(a => ({ userId: a._id, type: 'new_signup', message: `New signup: ${user.name} (${user.code})`, data: { userId: user._id, code: user.code } }));
+        const created = await Notification.insertMany(notifs);
+        // push SSE events
+        try {
+          const notifier = require('../utils/notifier');
+          created.forEach(n => notifier.sendEvent('notification', n));
+        } catch (e) { console.error('Failed to send SSE for signup', e.message) }
+      }
+    } catch (e) {
+      console.error('Failed to create admin notifications', e.message);
+    }
 
     const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '8h' });
     res.status(201).json({ message: 'Account created. Awaiting admin approval.', token, user: { id: user._id, name: user.name, code: user.code, role: user.role, phone: user.phone, email: user.email, isApproved: user.isApproved } });

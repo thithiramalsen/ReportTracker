@@ -24,3 +24,13 @@ Optional S3 configuration
 	- AWS_REGION=us-east-1
 
 When S3 vars are present the backend will store files in S3 and return the S3 file URL. Otherwise files are saved under the local `uploads/` folder.
+
+Notify.lk (SMS)
+- To enable Notify.lk, set the following env vars in your `.env` or deployment environment:
+	- `NOTIFYLK_ENABLED=true`
+	- `NOTIFYLK_USER_ID`
+	- `NOTIFYLK_API_KEY`
+	- `NOTIFYLK_SENDER_ID` (optional; default `NotifyDEMO`)
+	- `APP_BASE_URL` (recommended; used to build absolute download links)
+
+See `NOTIFYLK_SETUP.md` for step-by-step instructions and testing examples.
