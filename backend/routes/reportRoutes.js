@@ -255,7 +255,9 @@ router.get('/:id/download', async (req, res) => {
       const objectKey = extractS3Key(url);
       if (!objectKey) return res.status(500).json({ message: 'Invalid file URL' });
       try {
+        console.log('[REPORTS][DOWNLOAD][S3] signing', { reportId: String(report._id), objectKey, user: user && user.id, acceptsHtml });
         const signedUrl = await getSignedUrl(s3Client, new GetObjectCommand({ Bucket: awsBucket, Key: objectKey }), { expiresIn: 600 });
+        console.log('[REPORTS][DOWNLOAD][S3] redirect -> presigned', signedUrl);
         return res.redirect(signedUrl);
       } catch (e) {
         console.error('[REPORTS][DOWNLOAD][S3] presign failed', e.message || e);
