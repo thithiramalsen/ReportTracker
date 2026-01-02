@@ -39,7 +39,12 @@ app.use('/api/notify', notifyJobsRoutes);
 // Root route: helpful landing or redirect to frontend app
 app.get('/', (req, res) => {
   const frontend = process.env.APP_BASE_URL;
-  if (frontend) return res.redirect(frontend);
+  if (frontend) {
+    // ensure the frontend URL includes a scheme, otherwise redirect() treats it as a relative path
+    const hasScheme = /^https?:\/\//i.test(frontend);
+    const redirectTo = hasScheme ? frontend : `https://${frontend}`;
+    return res.redirect(redirectTo);
+  }
   res.send(`
     <html>
       <head><title>ReportTracker API</title></head>
