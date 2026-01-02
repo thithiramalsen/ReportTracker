@@ -241,7 +241,7 @@ router.get('/:id/download', async (req, res) => {
     // If unauthenticated and this looks like a browser navigation, redirect to login with next
     if (!user && isBrowserNav) {
       const frontend = process.env.APP_BASE_URL ? process.env.APP_BASE_URL.replace(/\/$/, '') : '';
-      const loginPath = '/auth/login';
+      const loginPath = '/login';
       const currentUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
       const redirectTo = frontend ? `${frontend}${loginPath}?next=${encodeURIComponent(currentUrl)}` : `${loginPath}?next=${encodeURIComponent(currentUrl)}`;
       console.log('[REPORTS][DOWNLOAD] unauthenticated browser request - redirecting to', redirectTo);
@@ -258,7 +258,7 @@ router.get('/:id/download', async (req, res) => {
       if (!access) {
         if (isBrowserNav) {
           const frontend = process.env.APP_BASE_URL ? process.env.APP_BASE_URL.replace(/\/$/, '') : '';
-          const loginPath = '/auth/login';
+          const loginPath = '/login';
           const currentUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
           const redirectTo = frontend ? `${frontend}${loginPath}?next=${encodeURIComponent(currentUrl)}` : `${loginPath}?next=${encodeURIComponent(currentUrl)}`;
           console.log('[REPORTS][DOWNLOAD] forbidden for user, redirecting to login', { user: user.id, reportId: String(report._id) });
@@ -313,7 +313,7 @@ router.get('/:id/download', async (req, res) => {
         // If request from browser, show friendly page instead of raw JSON
         if (acceptsHtml) {
           const frontend = process.env.APP_BASE_URL ? process.env.APP_BASE_URL.replace(/\/$/, '') : '';
-          const loginPath = '/auth/login';
+          const loginPath = '/login';
           const message = `File is not available on the server. Please log in to access or contact admin.`;
           // simple HTML response directing to login
           const loginUrl = frontend ? `${frontend}${loginPath}` : loginPath;
