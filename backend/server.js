@@ -36,6 +36,22 @@ app.use('/api/codes', codeRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/notify', notifyJobsRoutes);
 
+// Root route: helpful landing or redirect to frontend app
+app.get('/', (req, res) => {
+  const frontend = process.env.APP_BASE_URL;
+  if (frontend) return res.redirect(frontend);
+  res.send(`
+    <html>
+      <head><title>ReportTracker API</title></head>
+      <body style="font-family: Arial, sans-serif; padding: 2rem;">
+        <h1>ReportTracker API</h1>
+        <p>This service hosts the ReportTracker backend API.</p>
+        <p>Health: <a href="/api/health">/api/health</a></p>
+      </body>
+    </html>
+  `);
+});
+
 // Health
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
