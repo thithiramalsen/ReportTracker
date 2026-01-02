@@ -3,7 +3,6 @@ const multer = require('multer');
 const path = require('path');
 const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { Upload } = require('@aws-sdk/lib-storage');
-const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 const router = express.Router();
 const Report = require('../models/Report');
@@ -75,6 +74,16 @@ function extractS3Key(url) {
   } catch (e) {
     console.error('[REPORTS][S3] failed to parse url', url, e.message);
     return null;
+  }
+}
+
+function s3FilenameFromKey(key) {
+  try {
+    if (!key) return 'file';
+    const parts = key.split('/');
+    return parts[parts.length - 1] || 'file';
+  } catch (e) {
+    return 'file';
   }
 }
 
@@ -255,13 +264,30 @@ router.get('/:id/download', async (req, res) => {
       const objectKey = extractS3Key(url);
       if (!objectKey) return res.status(500).json({ message: 'Invalid file URL' });
       try {
-        console.log('[REPORTS][DOWNLOAD][S3] signing', { reportId: String(report._id), objectKey, user: user && user.id, acceptsHtml });
-        const signedUrl = await getSignedUrl(s3Client, new GetObjectCommand({ Bucket: awsBucket, Key: objectKey }), { expiresIn: 600 });
-        console.log('[REPORTS][DOWNLOAD][S3] redirect -> presigned', signedUrl);
-        return res.redirect(signedUrl);
+        console.log('[REPORTS][DOWNLOAD][S3] streaming', { reportId: String(report._id), objectKey, user: user && user.id, acceptsHtml });
+        const command = new GetObjectCommand({ Bucket: awsBucket, Key: objectKey });
+        const data = await s3Client.send(command);
+        res.setHeader('Content-Type', data.ContentType || 'application/octet-stream');
+        if (data.ContentLength) res.setHeader('Content-Length', data.ContentLength);
+        const fname = s3FilenameFromKey(objectKey);
+        res.setHeader('Content-Disposition', `inline; filename="${fname}"`);
+        if (data.Body && typeof data.Body.pipe === 'function') {
+          data.Body.pipe(res);
+          data.Body.on('error', (err) => {
+            console.error('[REPORTS][DOWNLOAD][S3] stream error', err.message || err);
+            if (!res.headersSent) res.status(500).end('Stream error');
+          });
+          return;
+        }
+        // fallback: if Body is a blob/arraybuffer-like
+        if (data.Body) {
+          res.send(data.Body);
+          return;
+        }
+        return res.status(500).json({ message: 'Empty file stream' });
       } catch (e) {
-        console.error('[REPORTS][DOWNLOAD][S3] presign failed', e.message || e);
-        return res.status(500).json({ message: 'Unable to generate download link' });
+        console.error('[REPORTS][DOWNLOAD][S3] stream failed', e.message || e);
+        return res.status(500).json({ message: 'Unable to stream file' });
       }
     }
 
