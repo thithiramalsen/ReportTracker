@@ -77,9 +77,21 @@ router.post('/signup', async (req, res) => {
       console.error('Failed to create admin notifications', e.message);
     }
 
-    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '8h' });
+    let token = null;
+    try {
+      if (process.env.JWT_SECRET) {
+        token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '8h' });
+      } else {
+        console.warn('[AUTH][SIGNUP] JWT_SECRET not set; skipping token generation');
+      }
+    } catch (e) {
+      console.error('[AUTH][SIGNUP] token generation failed', e && e.stack ? e.stack : e);
+      token = null;
+    }
+
     res.status(201).json({ message: 'Account created. Awaiting admin approval.', token, user: { id: user._id, name: user.name, code: user.code, role: user.role, phone: user.phone, email: user.email, isApproved: user.isApproved } });
   } catch (err) {
+    console.error('[AUTH][SIGNUP] error:', err && err.stack ? err.stack : err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
