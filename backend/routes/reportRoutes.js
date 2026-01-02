@@ -8,7 +8,8 @@ const router = express.Router();
 const Report = require('../models/Report');
 const ReportAccess = require('../models/ReportAccess');
 const User = require('../models/User');
-const { notifyReportUpload } = require('../utils/whatsapp');
+const { notifyReportUpload: notifyWhatsApp } = require('../utils/whatsapp');
+const { notifyReportUpload: notifySms } = require('../utils/notifylk');
 const { verifyToken, requireRole } = require('../middleware/authMiddleware');
 const fs = require('fs');
 const { promisify } = require('util');
@@ -150,8 +151,9 @@ router.post('/', verifyToken, requireRole('admin'), upload.single('file'), async
         console.error('Failed to create notifications for users', e.message);
       }
 
-      // non-blocking WhatsApp notify (placeholder)
-      notifyReportUpload({ report, users: assignedUsers }).catch(err => console.error('whatsapp notify failed', err.message));
+      // non-blocking notifications: WhatsApp + SMS (notify.lk)
+      try { notifyWhatsApp({ report, users: assignedUsers }).catch(err => console.error('whatsapp notify failed', err.message)); } catch(e) { console.error('whatsapp notify invocation failed', e.message) }
+      try { notifySms({ report, users: assignedUsers }).catch(err => console.error('notifylk sms failed', err.message)); } catch(e) { console.error('notifylk notify invocation failed', e.message) }
     }
 
     res.status(201).json({ message: 'Report uploaded', report });
