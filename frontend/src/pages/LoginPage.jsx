@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import API from '../api'
 import { useToast } from '../components/Toast'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useLocation } from 'react-router-dom'
 
 export default function LoginPage() {
   const [code, setCode] = useState('')
@@ -11,9 +11,15 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const toast = useToast()
 
+  const loc = useLocation()
   useEffect(() => {
     const token = localStorage.getItem('token')
-    if (token) navigate('/dashboard')
+    const params = new URLSearchParams(loc.search)
+    const next = params.get('next')
+    if (token) {
+      if (next) return navigate(`/open?next=${encodeURIComponent(next)}`)
+      return navigate('/dashboard')
+    }
   }, [])
 
   const submit = async (e) => {
@@ -23,6 +29,9 @@ export default function LoginPage() {
       localStorage.setItem('token', res.data.token)
       localStorage.setItem('user', JSON.stringify(res.data.user))
       try{ toast.show('Logged in', 'success') }catch(e){}
+      const params = new URLSearchParams(loc.search)
+      const next = params.get('next')
+      if (next) return navigate(`/open?next=${encodeURIComponent(next)}`)
       navigate('/dashboard')
     } catch (err) {
       const em = err?.response?.data?.message || 'Login failed'

@@ -15,9 +15,13 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const notifyJobsRoutes = require('./routes/notifyJobs');
 const notifylk = require('./utils/notifylk');
 
+// logging middleware
+const logger = require('./middleware/logger');
+
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(logger);
 
 // Serve uploads
 // Ensure uploads directory exists (prevents ENOENT when saving files to disk)
@@ -36,13 +40,45 @@ app.use('/api/codes', codeRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/notify', notifyJobsRoutes);
 
+// Root route: helpful landing or redirect to frontend app
+app.get('/', (req, res) => {
+  const frontend = process.env.APP_BASE_URL;
+  if (frontend) {
+    // ensure the frontend URL includes a scheme, otherwise redirect() treats it as a relative path
+    const hasScheme = /^https?:\/\//i.test(frontend);
+    const redirectTo = hasScheme ? frontend : `https://${frontend}`;
+    return res.redirect(redirectTo);
+  }
+  res.send(`
+    <html>
+      <head><title>ReportTracker API</title></head>
+      <body style="font-family: Arial, sans-serif; padding: 2rem;">
+        <h1>ReportTracker API</h1>
+        <p>This service hosts the ReportTracker backend API.</p>
+        <p>Health: <a href="/api/health">/api/health</a></p>
+      </body>
+    </html>
+  `);
+});
+
 // Health
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 // Error handler
+// Enhanced error handler: log stack and request context
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: 'Server error', error: err.message });
+  try {
+    const reqInfo = {
+      method: req.method,
+      url: req.originalUrl,
+      ip: req.ip,
+      body: req.body && typeof req.body === 'object' ? Object.keys(req.body).reduce((acc, k) => { acc[k] = /password|pwd|secret|token/i.test(k) ? '[REDACTED]' : req.body[k]; return acc }, {}) : req.body
+    };
+    console.error('[ERROR]', err && err.stack ? err.stack : err, JSON.stringify(reqInfo));
+  } catch (logErr) {
+    console.error('Error while logging error:', logErr);
+  }
+  res.status(500).json({ message: 'Server error', error: err && err.message ? err.message : String(err) });
 });
 
 const PORT = process.env.PORT || 5000;

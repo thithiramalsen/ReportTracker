@@ -1,7 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
-const { S3Client } = require('@aws-sdk/client-s3');
+const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { Upload } = require('@aws-sdk/lib-storage');
 
 const router = express.Router();
@@ -11,6 +11,7 @@ const User = require('../models/User');
 const { notifyReportUpload: notifyWhatsApp } = require('../utils/whatsapp');
 const { notifyReportUpload: notifySms } = require('../utils/notifylk');
 const { verifyToken, requireRole } = require('../middleware/authMiddleware');
+const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const { promisify } = require('util');
 const unlinkAsync = promisify(fs.unlink);
@@ -60,6 +61,30 @@ if (awsBucket && process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_
       } else cb(null, true);
     }
   });
+}
+
+// helper to extract object key from an S3 URL that looks like https://bucket.s3.region.amazonaws.com/key
+function extractS3Key(url) {
+  try {
+    const u = new URL(url);
+    // pathname starts with /key...
+    let key = u.pathname;
+    if (key.startsWith('/')) key = key.slice(1);
+    return decodeURIComponent(key);
+  } catch (e) {
+    console.error('[REPORTS][S3] failed to parse url', url, e.message);
+    return null;
+  }
+}
+
+function s3FilenameFromKey(key) {
+  try {
+    if (!key) return 'file';
+    const parts = key.split('/');
+    return parts[parts.length - 1] || 'file';
+  } catch (e) {
+    return 'file';
+  }
 }
 
 // POST /api/reports - admin only -> upload PDF + assign users
@@ -158,6 +183,7 @@ router.post('/', verifyToken, requireRole('admin'), upload.single('file'), async
 
     res.status(201).json({ message: 'Report uploaded', report });
   } catch (err) {
+    console.error('[REPORTS][UPLOAD] error:', err && err.stack ? err.stack : err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -188,36 +214,111 @@ router.get('/', verifyToken, async (req, res) => {
 });
 
 // GET /api/reports/:id/download - allow admin or assigned users to download
-router.get('/:id/download', verifyToken, async (req, res) => {
+// Behavior: If request is from a browser (Accept: text/html) and unauthenticated,
+// redirect to frontend login page with `next` param. For API/XHR requests, return JSON 401/403 as before.
+router.get('/:id/download', async (req, res) => {
   try {
+    // Attempt to authenticate from Authorization header (Bearer token) or from ?token=JWT
+    let user = null;
+    try {
+      const auth = req.headers.authorization;
+      const tokenFromHeader = (auth && auth.startsWith('Bearer ')) ? auth.split(' ')[1] : null;
+      const tokenFromQuery = req.query && (req.query.token || req.query.t) ? String(req.query.token || req.query.t) : null;
+      const tokenToVerify = tokenFromHeader || tokenFromQuery;
+      if (tokenToVerify) {
+        const decoded = jwt.verify(tokenToVerify, process.env.JWT_SECRET);
+        user = { id: decoded.id, role: decoded.role };
+        if (!tokenFromHeader && tokenFromQuery) console.log('[REPORTS][DOWNLOAD] authenticated via query token for user', user.id);
+      }
+    } catch (e) {
+      // token invalid/expired - treat as unauthenticated
+      console.warn('[REPORTS][DOWNLOAD] token invalid or expired', e && e.message ? e.message : e);
+      user = null;
+    }
+
+    // If unauthenticated and request looks like a browser navigation, redirect to login
+    const acceptsHtml = req.headers.accept && req.headers.accept.indexOf('text/html') !== -1;
+    if (!user) {
+      if (acceptsHtml) {
+        const frontend = process.env.APP_BASE_URL ? process.env.APP_BASE_URL.replace(/\/$/, '') : '';
+        const loginPath = '/login';
+        const currentUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+        const redirectTo = frontend ? `${frontend}${loginPath}?next=${encodeURIComponent(currentUrl)}` : `${loginPath}?next=${encodeURIComponent(currentUrl)}`;
+        console.log('[REPORTS][DOWNLOAD] unauthenticated browser request - redirecting to', redirectTo);
+        return res.redirect(302, redirectTo);
+      }
+      return res.status(401).json({ message: 'No token provided' });
+    }
+
+    // fetch report and perform access check
     const report = await Report.findById(req.params.id);
     if (!report) return res.status(404).json({ message: 'Report not found' });
 
-    // Check access
-    if (req.user.role !== 'admin') {
-      const access = await ReportAccess.findOne({ reportId: report._id, userId: req.user.id });
+    if (user.role !== 'admin') {
+      const access = await ReportAccess.findOne({ reportId: report._id, userId: user.id });
       if (!access) return res.status(403).json({ message: 'Not authorized to access this report' });
     }
 
     const url = report.fileUrl;
+    console.log('[REPORTS][DOWNLOAD] report', report._id, 'fileUrl=', url);
     if (!url) return res.status(404).json({ message: 'File not available' });
 
     if (useS3 && url.startsWith('http')) {
-      // redirect to S3 URL (assumes public)
-      return res.redirect(url);
+      const objectKey = extractS3Key(url);
+      if (!objectKey) return res.status(500).json({ message: 'Invalid file URL' });
+      try {
+        console.log('[REPORTS][DOWNLOAD][S3] streaming', { reportId: String(report._id), objectKey, user: user && user.id, acceptsHtml });
+        const command = new GetObjectCommand({ Bucket: awsBucket, Key: objectKey });
+        const data = await s3Client.send(command);
+        res.setHeader('Content-Type', data.ContentType || 'application/octet-stream');
+        if (data.ContentLength) res.setHeader('Content-Length', data.ContentLength);
+        const fname = s3FilenameFromKey(objectKey);
+        res.setHeader('Content-Disposition', `inline; filename="${fname}"`);
+        if (data.Body && typeof data.Body.pipe === 'function') {
+          data.Body.pipe(res);
+          data.Body.on('error', (err) => {
+            console.error('[REPORTS][DOWNLOAD][S3] stream error', err.message || err);
+            if (!res.headersSent) res.status(500).end('Stream error');
+          });
+          return;
+        }
+        // fallback: if Body is a blob/arraybuffer-like
+        if (data.Body) {
+          res.send(data.Body);
+          return;
+        }
+        return res.status(500).json({ message: 'Empty file stream' });
+      } catch (e) {
+        console.error('[REPORTS][DOWNLOAD][S3] stream failed', e.message || e);
+        return res.status(500).json({ message: 'Unable to stream file' });
+      }
     }
 
     // local file
     if (url.startsWith('/uploads/')) {
       const filename = url.replace('/uploads/', '');
       const filePath = path.join(__dirname, '..', 'uploads', filename);
-      if (!fs.existsSync(filePath)) return res.status(404).json({ message: 'File missing on server' });
+      const exists = fs.existsSync(filePath);
+      console.log('[REPORTS][DOWNLOAD] local filePath=', filePath, 'exists=', exists);
+      if (!exists) {
+        // If request from browser, show friendly page instead of raw JSON
+        if (acceptsHtml) {
+          const frontend = process.env.APP_BASE_URL ? process.env.APP_BASE_URL.replace(/\/$/, '') : '';
+          const loginPath = '/auth/login';
+          const message = `File is not available on the server. Please log in to access or contact admin.`;
+          // simple HTML response directing to login
+          const loginUrl = frontend ? `${frontend}${loginPath}` : loginPath;
+          return res.status(404).send(`<html><body><h3>${message}</h3><p><a href="${loginUrl}">Log in</a></p></body></html>`);
+        }
+        return res.status(404).json({ message: 'File missing on server' });
+      }
       return res.download(filePath);
     }
 
     // fallback: redirect to url
     return res.redirect(url);
   } catch (err) {
+    console.error('[REPORTS][DOWNLOAD] error:', err && err.stack ? err.stack : err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });

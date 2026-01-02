@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import API from '../api'
-import { UploadCloud, DownloadCloud, Trash2, Edit3, Eye } from 'lucide-react'
+import { UploadCloud, DownloadCloud, Trash2, Edit3, Eye, Clipboard } from 'lucide-react'
 import { useToast } from '../components/Toast'
 
 export default function UploadPage() {
@@ -78,6 +78,7 @@ export default function UploadPage() {
 
   const openBlob = async (id, asDownload = false) => {
     try {
+      console.log('[UI] download token', localStorage.getItem('token'))
       const resp = await API.get(`/reports/${id}/download`, { responseType: 'blob' })
       const blob = new Blob([resp.data], { type: resp.data.type || 'application/pdf' })
       const url = window.URL.createObjectURL(blob)
@@ -91,11 +92,24 @@ export default function UploadPage() {
       } else {
         window.open(url, '_blank')
       }
-      // release URL after a bit
       setTimeout(() => window.URL.revokeObjectURL(url), 10000)
     } catch (err) {
       console.error(err)
       try { toast.show('Unable to download file', 'error') } catch(e){}
+    }
+  }
+
+  const copyLink = async (id) => {
+    try {
+      // Build the same download URL used in notifications; requires auth and will redirect to login otherwise.
+      const rawBase = import.meta.env.VITE_API_BASE || `${window.location.origin}/api`
+      const apiBase = rawBase.replace(/\/$/, '')
+      const link = `${apiBase}/reports/${id}/download`
+      await navigator.clipboard.writeText(link)
+      try { toast.show('Link copied', 'success') } catch (e) { console.log('Link copied', link) }
+    } catch (err) {
+      console.error('copy link failed', err)
+      try { toast.show('Unable to copy link', 'error') } catch (e) {}
     }
   }
 
@@ -184,6 +198,7 @@ export default function UploadPage() {
                 <div className="flex items-center gap-2">
                   <button title="View" onClick={()=>openBlob(r._id)} className="px-2 py-1 border rounded" aria-label="view"><Eye className="w-4 h-4"/></button>
                   <button title="Download" onClick={()=>openBlob(r._id, true)} className="px-2 py-1 border rounded" aria-label="download"><DownloadCloud className="w-4 h-4"/></button>
+                  <button title="Copy login link" onClick={()=>copyLink(r._id)} className="px-2 py-1 border rounded" aria-label="copy-link"><Clipboard className="w-4 h-4"/></button>
                   <button title="Edit Assignments" onClick={()=>setEditingReport(r)} className="px-2 py-1 border rounded" aria-label="edit"><Edit3 className="w-4 h-4"/></button>
                   <button title="Delete" onClick={()=>removeReport(r._id)} className="px-2 py-1 border rounded text-red-600" aria-label="delete"><Trash2 className="w-4 h-4"/></button>
                 </div>

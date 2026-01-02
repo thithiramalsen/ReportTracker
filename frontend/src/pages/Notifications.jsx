@@ -8,18 +8,19 @@ export default function Notifications(){
   const toast = useToast()
 
   const openReportByUrl = async (url) => {
-    // normalize URL: API.baseURL already includes '/api', so strip leading '/api' to avoid duplication
-    let path = url
+    // Open download URL in a new tab to avoid S3 CORS issues (backend redirects to presigned URL)
     try {
       if (!url) throw new Error('no url')
+      let path = url
       if (url.startsWith('http://') || url.startsWith('https://')) {
-        path = url
-      } else if (url.startsWith('/api/')) {
+        // external link (unlikely) - open directly
+        window.open(url, '_blank')
+        return
+      }
+      if (url.startsWith('/api/')) {
         path = url.replace(/^\/api/, '')
       }
-    } catch (err) { console.error('openReportByUrl - invalid url', err); try { toast.show('Invalid report URL', 'error') } catch(e){}; return }
-
-    try {
+      console.log('[UI] download token', localStorage.getItem('token'))
       const resp = await API.get(path, { responseType: 'blob' })
       const blob = new Blob([resp.data], { type: (resp.data && resp.data.type) || 'application/pdf' })
       const u = window.URL.createObjectURL(blob)

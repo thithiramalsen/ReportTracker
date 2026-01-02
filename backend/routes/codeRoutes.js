@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const CodeSlot = require('../models/CodeSlot');
+const User = require('../models/User');
 const { verifyToken, requireRole } = require('../middleware/authMiddleware');
 
 // Admin: list all code slots
@@ -44,7 +45,13 @@ router.delete('/:id', verifyToken, requireRole('admin'), async (req, res) => {
   try {
     const slot = await CodeSlot.findById(req.params.id);
     if (!slot) return res.status(404).json({ message: 'Not found' });
-    if (slot.usedBy) return res.status(400).json({ message: 'Code already used; cannot delete' });
+    if (slot.usedBy) {
+      const user = await User.findById(slot.usedBy);
+      if (user) return res.status(400).json({ message: 'Code already used; cannot delete' });
+      // dangling reference: clear and allow delete
+      slot.usedBy = undefined;
+      await slot.save();
+    }
     await slot.deleteOne();
     res.json({ message: 'Deleted' });
   } catch (err) {
