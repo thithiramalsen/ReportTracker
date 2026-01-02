@@ -78,20 +78,20 @@ export default function UploadPage() {
 
   const openBlob = async (id, asDownload = false) => {
     try {
-      const base = (import.meta.env.VITE_API_BASE || 'http://localhost:5000/api').replace(/\/$/, '')
-      const full = `${base}/reports/${id}/download`
-      // open in new tab; backend will redirect to presigned S3 URL
+      const resp = await API.get(`/reports/${id}/download`, { responseType: 'blob' })
+      const blob = new Blob([resp.data], { type: resp.data.type || 'application/pdf' })
+      const url = window.URL.createObjectURL(blob)
       if (asDownload) {
-        // create temporary anchor to trigger download/navigation
         const a = document.createElement('a')
-        a.href = full
-        a.target = '_blank'
+        a.href = url
+        a.download = 'report.pdf'
         document.body.appendChild(a)
         a.click()
         a.remove()
       } else {
-        window.open(full, '_blank')
+        window.open(url, '_blank')
       }
+      setTimeout(() => window.URL.revokeObjectURL(url), 10000)
     } catch (err) {
       console.error(err)
       try { toast.show('Unable to download file', 'error') } catch(e){}

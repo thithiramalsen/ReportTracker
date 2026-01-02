@@ -5,9 +5,11 @@ import { FileText, Eye } from 'lucide-react'
 function ReportCard({ r }) {
   const openReport = async (id) => {
     try {
-      const base = (import.meta.env.VITE_API_BASE || 'http://localhost:5000/api').replace(/\/$/, '')
-      const full = `${base}/reports/${id}/download`
-      window.open(full, '_blank')
+      const resp = await API.get(`/reports/${id}/download`, { responseType: 'blob' })
+      const blob = new Blob([resp.data], { type: resp.data.type || 'application/pdf' })
+      const url = window.URL.createObjectURL(blob)
+      window.open(url, '_blank')
+      setTimeout(() => window.URL.revokeObjectURL(url), 10000)
     } catch (err) {
       console.error(err)
       alert('Unable to open report')

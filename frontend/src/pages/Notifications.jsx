@@ -11,20 +11,22 @@ export default function Notifications(){
     // Open download URL in a new tab to avoid S3 CORS issues (backend redirects to presigned URL)
     try {
       if (!url) throw new Error('no url')
-      const base = (import.meta.env.VITE_API_BASE || 'http://localhost:5000/api').replace(/\/$/, '')
+      let path = url
       if (url.startsWith('http://') || url.startsWith('https://')) {
+        // external link (unlikely) - open directly
         window.open(url, '_blank')
         return
       }
       if (url.startsWith('/api/')) {
-        const full = `${base}${url.replace(/^\/api/, '')}`
-        window.open(full, '_blank')
-        return
+        path = url.replace(/^\/api/, '')
       }
-      // fallback: treat as relative to api
-      window.open(`${base}${url.startsWith('/') ? url : '/' + url}`, '_blank')
+      const resp = await API.get(path, { responseType: 'blob' })
+      const blob = new Blob([resp.data], { type: (resp.data && resp.data.type) || 'application/pdf' })
+      const u = window.URL.createObjectURL(blob)
+      window.open(u, '_blank')
+      setTimeout(() => window.URL.revokeObjectURL(u), 10000)
     } catch (err) {
-      console.error('openReportByUrl error', err)
+      console.error('failed to fetch report blob', err)
       try { toast.show('Failed to open report', 'error') } catch(e){}
     }
   }
