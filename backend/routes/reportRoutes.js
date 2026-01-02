@@ -218,18 +218,21 @@ router.get('/', verifyToken, async (req, res) => {
 // redirect to frontend login page with `next` param. For API/XHR requests, return JSON 401/403 as before.
 router.get('/:id/download', async (req, res) => {
   try {
-    // Attempt to authenticate from Authorization header (Bearer token)
+    // Attempt to authenticate from Authorization header (Bearer token) or from ?token=JWT
     let user = null;
     try {
       const auth = req.headers.authorization;
-      if (auth && auth.startsWith('Bearer ')) {
-        const token = auth.split(' ')[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const tokenFromHeader = (auth && auth.startsWith('Bearer ')) ? auth.split(' ')[1] : null;
+      const tokenFromQuery = req.query && (req.query.token || req.query.t) ? String(req.query.token || req.query.t) : null;
+      const tokenToVerify = tokenFromHeader || tokenFromQuery;
+      if (tokenToVerify) {
+        const decoded = jwt.verify(tokenToVerify, process.env.JWT_SECRET);
         user = { id: decoded.id, role: decoded.role };
+        if (!tokenFromHeader && tokenFromQuery) console.log('[REPORTS][DOWNLOAD] authenticated via query token for user', user.id);
       }
     } catch (e) {
       // token invalid/expired - treat as unauthenticated
-      console.warn('[REPORTS][DOWNLOAD] token invalid or expired');
+      console.warn('[REPORTS][DOWNLOAD] token invalid or expired', e && e.message ? e.message : e);
       user = null;
     }
 
