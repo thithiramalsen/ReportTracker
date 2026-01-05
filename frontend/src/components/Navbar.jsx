@@ -52,6 +52,7 @@ export default function Navbar() {
         {user?.role === 'admin' && <Link className="text-sm text-gray-700" to="/admin/codes">Manage Codes</Link>}
         {user?.role === 'admin' && <Link className="text-sm text-gray-700" to="/admin/notify-jobs">SMS Jobs</Link>}
         {user?.role === 'admin' && <Link className="text-sm text-gray-700" to="/admin/notify-analytics">Analytics</Link>}
+        {user?.role === 'admin' && <Link className="text-sm text-gray-700" to="/admin/daily-data">Daily Data</Link>}
         {user ? (
           <>
             <Link className="flex items-center gap-2" to="/settings"><User className="w-5 h-5 text-gray-600"/>
