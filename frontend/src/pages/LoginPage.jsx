@@ -58,7 +58,7 @@ export default function LoginPage() {
         {error && <div className="text-red-600">{error}</div>}
         <button className="mt-3 btn" type="submit">Login</button>
       </form>
-      <div className="mt-3 text-sm text-gray-600">If you forget your password, contact your admin to reset it.</div>
+      <div className="mt-3 text-sm text-gray-600">If you forget your password, you can request a reset: <Link to="/forgot" className="text-blue-600">Reset password</Link></div>
       <div className="mt-3 text-sm">
         Don't have an account? <Link to="/signup" className="text-blue-600">Sign up</Link>
       </div>
