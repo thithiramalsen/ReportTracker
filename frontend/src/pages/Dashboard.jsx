@@ -21,7 +21,8 @@ function ReportCard({ r }) {
     <div className="card mb-3">
       <h4 className="text-lg font-semibold">{r.title}</h4>
       <div className="text-sm text-gray-600">{r.description}</div>
-      <div className="text-sm text-gray-500">{new Date(r.reportDate).toLocaleDateString()}</div>
+      <div className="text-sm text-gray-500">Report date: {new Date(r.reportDate).toLocaleDateString()}</div>
+      <div className="text-sm text-gray-500">Uploaded: {r.createdAt ? new Date(r.createdAt).toLocaleString() : '—'}</div>
       <button onClick={() => openReport(r._id)} className="text-blue-600 inline-flex items-center gap-2"><Eye className="w-4 h-4"/>View PDF</button>
     </div>
   )
@@ -32,7 +33,10 @@ export default function Dashboard() {
 
   useEffect(() => {
     API.get('/reports')
-      .then(res => setReports(res.data))
+      .then(res => {
+        const sorted = (res.data || []).slice().sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt))
+        setReports(sorted)
+      })
       .catch(err => console.error(err))
   }, [])
 

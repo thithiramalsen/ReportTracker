@@ -28,7 +28,9 @@ export default function UploadPage() {
   const fetchReports = async () => {
     try {
       const res = await API.get('/reports')
-      setReports(res.data)
+      // Ensure sorted by upload time (createdAt) client-side as well
+      const sorted = (res.data || []).slice().sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt))
+      setReports(sorted)
     } catch (e) {
       console.error(e)
     }
@@ -192,7 +194,8 @@ export default function UploadPage() {
               <div key={r._id} className="border rounded p-3 flex items-start justify-between gap-4">
                 <div>
                   <div className="font-medium">{r.title}</div>
-                  <div className="text-sm text-gray-600">{new Date(r.reportDate).toLocaleDateString()} &middot; {r.description}</div>
+                  <div className="text-sm text-gray-600">Report date: {new Date(r.reportDate).toLocaleDateString()}</div>
+                  <div className="text-sm text-gray-500">Uploaded: {r.createdAt ? new Date(r.createdAt).toLocaleString() : '—'}</div>
                   <div className="text-sm text-gray-700 mt-2">Assigned: {r.assignedUsers && r.assignedUsers.length ? r.assignedUsers.map(u=>u.name || u.code).join(', ') : '—'}</div>
                 </div>
                 <div className="flex items-center gap-2">

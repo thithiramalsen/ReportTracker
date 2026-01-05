@@ -192,7 +192,7 @@ router.post('/', verifyToken, requireRole('admin'), upload.single('file'), async
 router.get('/', verifyToken, async (req, res) => {
   try {
     if (req.user.role === 'admin') {
-      const reports = await Report.find().sort({ reportDate: -1 });
+      const reports = await Report.find().sort({ createdAt: -1 });
       // attach assigned users for admin view
       const results = [];
       for (const r of reports) {
@@ -206,7 +206,7 @@ router.get('/', verifyToken, async (req, res) => {
     // user: find reportIds from ReportAccess
     const accesses = await ReportAccess.find({ userId: req.user.id }).select('reportId');
     const reportIds = accesses.map(a => a.reportId);
-    const reports = await Report.find({ _id: { $in: reportIds } }).sort({ reportDate: -1 });
+    const reports = await Report.find({ _id: { $in: reportIds } }).sort({ createdAt: -1 });
     res.json(reports);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
