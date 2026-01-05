@@ -4,11 +4,13 @@ const jwt = require('jsonwebtoken');
 
 const router = express.Router();
 
+const crypto = require('crypto');
 const User = require('../models/User');
 const { verifyToken, requireRole } = require('../middleware/authMiddleware');
 const { validatePassword } = require('../utils/password');
 const CodeSlot = require('../models/CodeSlot');
 const Notification = require('../models/Notification');
+const { sendEmail } = require('../utils/email');
 
 // Admin creates users (code + password)
 router.post('/register', verifyToken, requireRole('admin'), async (req, res) => {
@@ -30,6 +32,21 @@ router.post('/register', verifyToken, requireRole('admin'), async (req, res) => 
     if (email) userData.email = email;
     const user = new User(userData);
     await user.save();
+
+    // Send email verification if enabled and email present
+    try {
+      if (process.env.REQUIRE_EMAIL_VERIFICATION === 'true' && user.email) {
+        const vtoken = crypto.randomBytes(20).toString('hex');
+        user.emailVerificationToken = vtoken;
+        user.emailVerificationExpires = Date.now() + (24 * 60 * 60 * 1000); // 24h
+        user.isVerified = false;
+        await user.save();
+        const frontend = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const link = `${frontend}/verify-email?token=${vtoken}`;
+        const info = await sendEmail({ to: user.email, subject: 'Verify your email', text: `Verify: ${link}`, html: `<p>Verify your email: <a href="${link}">Verify</a></p>` });
+        if (info && info.previewUrl) console.log('[AUTH][REGISTER] email preview:', info.previewUrl);
+      }
+    } catch (e) { console.error('[AUTH][REGISTER] email verification send failed', e && e.message ? e.message : e); }
 
     res.status(201).json({ message: 'User created', user: { id: user._id, name: user.name, code: user.code, role: user.role, phone: user.phone, email: user.email, isApproved: user.isApproved } });
   } catch (err) {
@@ -75,6 +92,21 @@ router.post('/signup', async (req, res) => {
     slot.usedBy = user._id;
     await slot.save();
 
+    // Send email verification if enabled and email present
+    try {
+      if (process.env.REQUIRE_EMAIL_VERIFICATION === 'true' && user.email) {
+        const vtoken = crypto.randomBytes(20).toString('hex');
+        user.emailVerificationToken = vtoken;
+        user.emailVerificationExpires = Date.now() + (24 * 60 * 60 * 1000); // 24h
+        user.isVerified = false;
+        await user.save();
+        const frontend = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const link = `${frontend}/verify-email?token=${vtoken}`;
+        const info = await sendEmail({ to: user.email, subject: 'Verify your email', text: `Verify: ${link}`, html: `<p>Verify your email: <a href="${link}">Verify</a></p>` });
+        if (info && info.previewUrl) console.log('[AUTH][SIGNUP] email preview:', info.previewUrl);
+      }
+    } catch (e) { console.error('[AUTH][SIGNUP] email verification send failed', e && e.message ? e.message : e); }
+
     // notify admins about new signup
     try {
       const admins = await User.find({ role: 'admin' }).select('_id');
@@ -110,18 +142,80 @@ router.post('/signup', async (req, res) => {
   }
 });
 
-// Email verification disabled
-router.get('/verify', (req, res) => {
-  res.status(410).json({ message: 'Verification not required. Contact admin for access.' });
+// Email verification
+// If REQUIRE_EMAIL_VERIFICATION=true, users will receive verification emails on signup/register
+router.get('/verify', async (req, res) => {
+  const { token } = req.query;
+  if (!token) return res.status(400).json({ message: 'Missing token' });
+  try {
+    const user = await User.findOne({ emailVerificationToken: token, emailVerificationExpires: { $gt: Date.now() } });
+    if (!user) return res.status(400).json({ message: 'Invalid or expired token' });
+    user.isVerified = true;
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpires = undefined;
+    await user.save();
+    return res.json({ message: 'Email verified' });
+  } catch (err) {
+    console.error('[AUTH][VERIFY]', err && err.stack ? err.stack : err);
+    return res.status(500).json({ message: 'Server error' });
+  }
 });
 
-// Forgot/reset disabled (admin resets passwords)
-router.post('/forgot', (req, res) => {
-  res.status(410).json({ message: 'Password reset is handled by admin.' });
+// Forgot password - send reset email
+router.post('/forgot', async (req, res) => {
+  const { email, code } = req.body;
+  try {
+    let user = null;
+    if (email) user = await User.findOne({ email: String(email).trim().toLowerCase() });
+    else if (code) user = await User.findOne({ code: String(code).trim().toLowerCase() });
+    if (!user) return res.status(400).json({ message: 'User not found or no email available' });
+    if (!user.email) return res.status(400).json({ message: 'No email set for this account. Contact admin.' });
+
+    // generate short numeric verification code (6 digits)
+    const vcode = Math.floor(100000 + Math.random() * 900000).toString();
+    user.resetPasswordToken = vcode;
+    user.resetPasswordExpires = Date.now() + (60 * 60 * 1000); // 1 hour
+    await user.save();
+
+    const frontend = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const resetLink = `${frontend}/reset?code=${vcode}`;
+    const subject = 'Password reset code';
+    const text = `Your password reset code is: ${vcode}\nYou can also open: ${resetLink}`;
+    const html = `<p>Your password reset code is: <strong>${vcode}</strong></p><p>You can also open <a href="${resetLink}">this link</a>.</p>`;
+
+    try {
+      const info = await sendEmail({ to: user.email, subject, text, html });
+      if (info && info.previewUrl) console.log('[AUTH][FORGOT] previewUrl:', info.previewUrl);
+      const resp = { message: 'Reset email sent if account exists' };
+      if (info && info.previewUrl && process.env.NODE_ENV !== 'production') resp.previewUrl = info.previewUrl;
+      return res.json(resp);
+    } catch (e) { console.error('[AUTH][FORGOT] email send failed', e && e.message ? e.message : e); return res.json({ message: 'Reset email sent if account exists' }); }
+  } catch (err) {
+    console.error('[AUTH][FORGOT]', err && err.stack ? err.stack : err);
+    return res.status(500).json({ message: 'Server error' });
+  }
 });
 
-router.post('/reset', (req, res) => {
-  res.status(410).json({ message: 'Password reset is handled by admin.' });
+// Reset password using token
+router.post('/reset', async (req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password) return res.status(400).json({ message: 'Missing fields' });
+  const pwCheck = validatePassword(password);
+  if (!pwCheck.valid) return res.status(400).json({ message: 'Weak password', errors: pwCheck.errors });
+  try {
+    // support both full tokens and short numeric codes (code field may be used)
+    const codeOrToken = token
+    const user = await User.findOne({ resetPasswordToken: codeOrToken, resetPasswordExpires: { $gt: Date.now() } });
+    if (!user) return res.status(400).json({ message: 'Invalid or expired token' });
+    user.password = await require('bcryptjs').hash(password, 10);
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+    return res.json({ message: 'Password reset' });
+  } catch (err) {
+    console.error('[AUTH][RESET]', err && err.stack ? err.stack : err);
+    return res.status(500).json({ message: 'Server error' });
+  }
 });
 
 // Admin reset password

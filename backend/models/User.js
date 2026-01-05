@@ -10,7 +10,10 @@ const UserSchema = new mongoose.Schema(
     role: { type: String, enum: ['admin', 'manager', 'user'], default: 'user' },
     isApproved: { type: Boolean, default: true },
     resetPasswordToken: { type: String },
-    resetPasswordExpires: { type: Date }
+    resetPasswordExpires: { type: Date },
+    emailVerificationToken: { type: String },
+    emailVerificationExpires: { type: Date },
+    isVerified: { type: Boolean, default: false }
   },
   { timestamps: true }
 );
