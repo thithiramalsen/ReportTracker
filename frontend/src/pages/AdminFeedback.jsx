@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import API from '../api'
 import { MessageSquare, Clock, CheckCircle, XCircle } from 'lucide-react'
+import { useToast } from '../components/Toast'
+import Confirm from '../components/Confirm'
 
 export default function AdminFeedback(){
   const [items, setItems] = useState([])
@@ -18,6 +20,9 @@ export default function AdminFeedback(){
     const url = filterReportId ? `/feedback?reportId=${encodeURIComponent(filterReportId)}` : '/feedback'
     return API.get(url).then(r=>setItems(r.data)).catch(e=>console.error(e))
   }
+
+  const toast = useToast()
+  const [pendingDelete, setPendingDelete] = useState(null)
 
   useEffect(()=>{ 
     // read reportId from querystring if present
@@ -39,15 +44,19 @@ export default function AdminFeedback(){
   const doReply = async () => {
     try{
       await API.patch(`/feedback/${selected._id}/reply`, { text: replyText, status: 'closed' })
-      alert('Replied')
+      toast.show('Replied', 'success')
       setSelected(null)
       fetch()
-    }catch(e){ console.error(e); alert('Reply failed') }
+    }catch(e){ console.error(e); toast.show('Reply failed', 'error') }
   }
 
   const doDelete = async (id) => {
-    if (!confirm('Delete feedback?')) return
-    try{ await API.delete(`/feedback/${id}`); fetch() }catch(e){ console.error(e); alert('Delete failed') }
+    setPendingDelete(id)
+  }
+
+  const doConfirmDelete = async (id) => {
+    setPendingDelete(null)
+    try{ await API.delete(`/feedback/${id}`); fetch(); toast.show('Deleted', 'success') }catch(e){ console.error(e); toast.show('Delete failed', 'error') }
   }
 
   function timeAgo(d){
@@ -145,6 +154,7 @@ export default function AdminFeedback(){
           </div>
         </div>
       )}
+      <Confirm open={!!pendingDelete} title="Delete feedback?" onCancel={()=>setPendingDelete(null)} onConfirm={()=>doConfirmDelete(pendingDelete)} />
     </div>
   )
 }

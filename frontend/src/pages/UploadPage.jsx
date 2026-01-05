@@ -74,7 +74,7 @@ export default function UploadPage() {
   }
 
   function tryToast(msg, type='info'){
-    try{ toast.show(msg, type) }catch(e){ alert(msg) }
+    try{ toast.show(msg, type) }catch(e){ console.log(msg) }
   }
 
   const toggle = (id) => {
