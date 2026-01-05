@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import API from '../api'
 import { FileText, Eye, MessageSquare, Clock } from 'lucide-react'
+import { useToast } from '../components/Toast'
 
 function ReportCard({ r }) {
   const user = JSON.parse(localStorage.getItem('user') || 'null')
@@ -15,6 +16,7 @@ function ReportCard({ r }) {
   }
 
   const openReport = async (id) => {
+    const toast = useToast()
     try {
       console.log('[UI] download token', localStorage.getItem('token'))
       const resp = await API.get(`/reports/${id}/download`, { responseType: 'blob' })
@@ -24,7 +26,7 @@ function ReportCard({ r }) {
       setTimeout(() => window.URL.revokeObjectURL(url), 10000)
     } catch (err) {
       console.error(err)
-      alert('Unable to open report')
+      try { toast.show('Unable to open report', 'error') } catch(e){ alert('Unable to open report') }
     }
   }
 

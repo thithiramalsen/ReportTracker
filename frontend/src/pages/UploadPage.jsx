@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import API from '../api'
 import { UploadCloud, DownloadCloud, Trash2, Edit3, Eye, Clipboard } from 'lucide-react'
 import { useToast } from '../components/Toast'
+import Confirm from '../components/Confirm'
 
 export default function UploadPage() {
   const [title, setTitle] = useState('')
@@ -14,6 +15,7 @@ export default function UploadPage() {
   const [selectedCodes, setSelectedCodes] = useState([])
   const [reports, setReports] = useState([])
   const [editingReport, setEditingReport] = useState(null)
+  const [pendingDelete, setPendingDelete] = useState(null)
   const toast = useToast()
   const [isUploading, setIsUploading] = useState(false)
   const user = JSON.parse(localStorage.getItem('user') || 'null')
@@ -117,16 +119,8 @@ export default function UploadPage() {
   }
 
   const removeReport = async (id) => {
-    if (!confirm('Delete this report? This cannot be undone.')) return
-    try {
-      await API.delete(`/reports/${id}`)
-      try { toast.show('Report deleted', 'success') } catch(e){}
-      fetchReports()
-    } catch (err) {
-      console.error(err)
-      const em = err?.response?.data?.message || 'Delete failed'
-      try { toast.show(em, 'error') } catch(e){}
-    }
+    // show confirm modal instead of browser confirm
+    setPendingDelete(id)
   }
 
   const saveAssignments = async (reportId, userIds) => {
@@ -239,6 +233,21 @@ export default function UploadPage() {
           </div>
         </div>
       )}
+
+      <Confirm open={!!pendingDelete} title="Delete report?" description="This cannot be undone." onCancel={()=>setPendingDelete(null)} onConfirm={()=>doConfirmDelete(pendingDelete)} />
     </div>
   )
 }
+
+  const doConfirmDelete = async (id) => {
+    setPendingDelete(null)
+    try {
+      await API.delete(`/reports/${id}`)
+      try { toast.show('Report deleted', 'success') } catch(e){}
+      fetchReports()
+    } catch (err) {
+      console.error(err)
+      const em = err?.response?.data?.message || 'Delete failed'
+      try { toast.show(em, 'error') } catch(e){}
+    }
+  }
