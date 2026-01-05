@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import API from '../api'
 import { useToast } from '../components/Toast'
+import Confirm from '../components/Confirm'
 import { MapPin } from 'lucide-react'
 
 export default function AdminCodes(){
@@ -9,6 +10,7 @@ export default function AdminCodes(){
   const [label, setLabel] = useState('')
   const [role, setRole] = useState('user')
   const toast = useToast()
+  const [pendingDelete, setPendingDelete] = useState(null)
 
   const load = () => API.get('/codes').then(r=>setCodes(r.data)).catch(e=>console.error(e))
   useEffect(()=>{ load() }, [])
@@ -28,7 +30,11 @@ export default function AdminCodes(){
   }
 
   const remove = async (id) => {
-    if (!confirm('Delete code slot?')) return
+    setPendingDelete(id)
+  }
+
+  const doConfirmDelete = async (id) => {
+    setPendingDelete(null)
     try {
       await API.delete(`/codes/${id}`)
       load()
@@ -80,6 +86,7 @@ export default function AdminCodes(){
           </div>
         ))}
       </div>
+      <Confirm open={!!pendingDelete} title="Delete code slot?" onCancel={()=>setPendingDelete(null)} onConfirm={()=>doConfirmDelete(pendingDelete)} />
     </div>
   )
 }

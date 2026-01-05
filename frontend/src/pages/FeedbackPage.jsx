@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import API from '../api'
 import { MessageSquare, Clock } from 'lucide-react'
+import { useToast } from '../components/Toast'
 
 export default function FeedbackPage(){
+  const toast = useToast()
   const [message, setMessage] = useState('')
   const [type, setType] = useState('feedback')
   const [reportId, setReportId] = useState('')
@@ -45,7 +47,7 @@ export default function FeedbackPage(){
       setType('feedback')
       setReportId('')
       API.get('/feedback/mine').then(r=>setMine(r.data)).catch(()=>{})
-      alert('Feedback submitted')
+      toast.show('Feedback submitted', 'success')
     }catch(e){ console.error(e); alert('Submit failed') }
   }
 

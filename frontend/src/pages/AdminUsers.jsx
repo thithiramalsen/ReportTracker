@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import API from '../api'
 import { Users } from 'lucide-react'
 import { useToast } from '../components/Toast'
+import Confirm from '../components/Confirm'
 
 export default function AdminUsers() {
   const [users, setUsers] = useState([])
@@ -11,19 +12,13 @@ export default function AdminUsers() {
   }
 
   const toast = useToast()
+  const [pendingDelete, setPendingDelete] = useState(null)
+  const [pendingDeny, setPendingDeny] = useState(null)
 
   useEffect(()=>{ load() }, [])
 
   const remove = async (id) => {
-    if (!confirm('Delete user?')) return
-    try {
-      await API.delete(`/users/${id}`)
-      load()
-      try { toast.show('User deleted', 'success') } catch(e){}
-    } catch (err) {
-      const em = err?.response?.data?.message || 'Delete failed'
-      try { toast.show(em, 'error') } catch(e){}
-    }
+    setPendingDelete(id)
   }
 
   const approve = async (id) => {
@@ -38,15 +33,17 @@ export default function AdminUsers() {
   }
 
   const deny = async (id) => {
-    if (!confirm('Deny and remove this user?')) return
-    try {
-      await API.post(`/users/${id}/deny`)
-      load()
-      try { toast.show('User denied and removed', 'success') } catch(e){}
-    } catch (err) {
-      const em = err?.response?.data?.message || 'Deny failed'
-      try { toast.show(em, 'error') } catch(e){}
-    }
+    setPendingDeny(id)
+  }
+
+  const doConfirmDelete = async (id) => {
+    setPendingDelete(null)
+    try { await API.delete(`/users/${id}`); load(); toast.show('User deleted','success') } catch(e){ const em = e?.response?.data?.message || 'Delete failed'; toast.show(em,'error') }
+  }
+
+  const doConfirmDeny = async (id) => {
+    setPendingDeny(null)
+    try { await API.post(`/users/${id}/deny`); load(); toast.show('User denied and removed','success') } catch(e){ const em = e?.response?.data?.message || 'Deny failed'; toast.show(em,'error') }
   }
 
   return (
@@ -67,6 +64,8 @@ export default function AdminUsers() {
           </div>
         ))}
       </div>
+      <Confirm open={!!pendingDelete} title="Delete user?" onCancel={()=>setPendingDelete(null)} onConfirm={()=>doConfirmDelete(pendingDelete)} />
+      <Confirm open={!!pendingDeny} title="Deny and remove this user?" onCancel={()=>setPendingDeny(null)} onConfirm={()=>doConfirmDeny(pendingDeny)} />
     </div>
   )
 }

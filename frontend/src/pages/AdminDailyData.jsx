@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import API from '../api'
 import { useToast } from '../components/Toast'
+import Confirm from '../components/Confirm'
 
 export default function AdminDailyData(){
   const [date, setDate] = useState('')
@@ -12,6 +13,7 @@ export default function AdminDailyData(){
   const [codes, setCodes] = useState([])
   const [editing, setEditing] = useState(null)
   const toast = useToast()
+  const [pendingDelete, setPendingDelete] = useState(null)
 
   const load = async () => {
     try {
@@ -57,7 +59,11 @@ export default function AdminDailyData(){
   }
 
   const remove = async (id) => {
-    if (!confirm('Delete entry?')) return
+    setPendingDelete(id)
+  }
+
+  const doConfirmDelete = async (id) => {
+    setPendingDelete(null)
     try {
       await API.delete(`/daily-data/${id}`)
       try { toast.show('Deleted', 'success') } catch(e){}
@@ -118,6 +124,7 @@ export default function AdminDailyData(){
             ))}
           </div>
         )}
+        <Confirm open={!!pendingDelete} title="Delete entry?" onCancel={()=>setPendingDelete(null)} onConfirm={()=>doConfirmDelete(pendingDelete)} />
       </div>
     </div>
   )
