@@ -33,30 +33,40 @@ export default function Navbar() {
   }
 
   return (
-    <div className="flex items-center justify-between p-3 border-b bg-white">
-      <div className="flex items-center gap-3">
+    <div className="flex items-center justify-between p-3 border-b bg-white shadow-sm sticky top-0 z-40">
+      <div className="flex items-center gap-4">
         <img
           src={'/logo.png'}
           alt="Lalan logo"
           onError={() => setImgError(true)}
           className={imgError ? 'hidden h-11' : 'h-11'}
         />
-        <div className="font-bold text-lg">Lalan rubbers Pvt LTD</div>
+        <div className="font-semibold text-lg text-gray-800">Lalan Rubbers</div>
       </div>
 
       <div className="flex items-center gap-4">
-        <Link className="flex items-center gap-1 text-sm text-gray-700" to="/dashboard"><Home className="w-4 h-4"/> Dashboard</Link>
-        {user?.role === 'admin' && <Link className="flex items-center gap-1 text-sm text-gray-700" to="/upload"><UploadCloud className="w-4 h-4"/> Upload</Link>}
-        {user && <Link className="flex items-center gap-1 text-sm text-gray-700" to="/notifications"><Bell className="w-4 h-4"/>{unread>0 && <span className="ml-1 inline-block bg-red-600 text-white text-xs px-2 py-0.5 rounded">{unread}</span>}</Link>}
-        {user?.role === 'admin' && <Link className="text-sm text-gray-700" to="/admin/users">Manage Users</Link>}
-        {user?.role === 'admin' && <Link className="text-sm text-gray-700" to="/admin/codes">Manage Codes</Link>}
-        {user?.role === 'admin' && <Link className="text-sm text-gray-700" to="/admin/notify-jobs">SMS Jobs</Link>}
-        {user?.role === 'admin' && <Link className="text-sm text-gray-700" to="/admin/analytics">Analytics</Link>}
-        {user?.role === 'admin' && <Link className="text-sm text-gray-700" to="/admin/daily-data">Daily Data</Link>}
+        <Link className="flex items-center gap-1 text-sm text-gray-700 hover:text-gray-900" to="/dashboard"><Home className="w-4 h-4"/> Dashboard</Link>
+        {user?.role === 'admin' && (
+          <>
+            <Link className="flex items-center gap-1 text-sm text-white bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded" to="/upload"><UploadCloud className="w-4 h-4"/> Upload</Link>
+            <Link className="flex items-center gap-1 text-sm text-white bg-green-600 hover:bg-green-700 px-3 py-1 rounded" to="/admin/daily-data">Daily Data</Link>
+          </>
+        )}
+
+        {user?.role === 'admin' && <Link className="text-sm text-gray-600 hover:text-gray-800" to="/admin/analytics">Analytics</Link>}
+        {user?.role === 'admin' && <Link className="text-sm text-gray-600 hover:text-gray-800" to="/admin/users">Manage Users</Link>}
+        {user?.role === 'admin' && <Link className="text-sm text-gray-600 hover:text-gray-800" to="/admin/codes">Manage Codes</Link>}
+        {user?.role === 'admin' && <Link className="text-sm text-gray-600 hover:text-gray-800" to="/admin/notify-jobs">SMS Jobs</Link>}
+
         {user ? (
           <>
-            <Link className="flex items-center gap-2" to="/settings"><User className="w-5 h-5 text-gray-600"/>
-              <span className="text-sm text-gray-600">{user.name}</span>
+            <Link className="flex items-center gap-3" to="/notifications">
+              <Bell className="w-5 h-5 text-gray-600"/>
+              {unread>0 && <span className="-ml-3 mt-0.5 inline-flex items-center justify-center w-5 h-5 bg-red-600 text-white text-xs rounded-full">{unread}</span>}
+            </Link>
+
+            <Link className="flex items-center gap-2 ml-2" to="/settings"><User className="w-5 h-5 text-gray-600"/>
+              <span className="text-sm text-gray-700">{user.name}</span>
             </Link>
             <button className="px-3 py-1 bg-red-50 text-red-600 rounded flex items-center gap-2" onClick={logout}><LogOut className="w-4 h-4"/>Logout</button>
           </>
