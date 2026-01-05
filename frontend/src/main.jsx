@@ -46,7 +46,7 @@ createRoot(document.getElementById('root')).render(
           <Route path='/admin/users' element={<AdminRoute><AdminUsers /></AdminRoute>} />
           <Route path='/admin/codes' element={<AdminRoute><AdminCodes /></AdminRoute>} />
           <Route path='/admin/notify-jobs' element={<AdminRoute><AdminNotifyJobs /></AdminRoute>} />
-          <Route path='/admin/notify-analytics' element={<AdminRoute><AdminNotifyAnalytics /></AdminRoute>} />
+          <Route path='/admin/analytics' element={<AdminRoute><AdminNotifyAnalytics /></AdminRoute>} />
           <Route path='/admin/daily-data' element={<AdminRoute><AdminDailyData /></AdminRoute>} />
           <Route path='/notifications' element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
         </Routes>

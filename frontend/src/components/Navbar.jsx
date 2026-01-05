@@ -51,7 +51,7 @@ export default function Navbar() {
         {user?.role === 'admin' && <Link className="text-sm text-gray-700" to="/admin/users">Manage Users</Link>}
         {user?.role === 'admin' && <Link className="text-sm text-gray-700" to="/admin/codes">Manage Codes</Link>}
         {user?.role === 'admin' && <Link className="text-sm text-gray-700" to="/admin/notify-jobs">SMS Jobs</Link>}
-        {user?.role === 'admin' && <Link className="text-sm text-gray-700" to="/admin/notify-analytics">Analytics</Link>}
+        {user?.role === 'admin' && <Link className="text-sm text-gray-700" to="/admin/analytics">Analytics</Link>}
         {user?.role === 'admin' && <Link className="text-sm text-gray-700" to="/admin/daily-data">Daily Data</Link>}
         {user ? (
           <>
