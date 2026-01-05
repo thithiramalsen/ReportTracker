@@ -10,6 +10,9 @@ import AdminUsers from './pages/AdminUsers'
 import AdminCodes from './pages/AdminCodes'
 import AdminNotifyJobs from './pages/AdminNotifyJobs'
 import AdminNotifyAnalytics from './pages/AdminNotifyAnalytics'
+import AdminFeedback from './pages/AdminFeedback'
+import FeedbackPage from './pages/FeedbackPage'
+import AdminDailyData from './pages/AdminDailyData'
 import Notifications from './pages/Notifications'
 import OpenNext from './pages/OpenNext'
 import ForgotPassword from './pages/ForgotPassword'
@@ -45,7 +48,10 @@ createRoot(document.getElementById('root')).render(
           <Route path='/admin/users' element={<AdminRoute><AdminUsers /></AdminRoute>} />
           <Route path='/admin/codes' element={<AdminRoute><AdminCodes /></AdminRoute>} />
           <Route path='/admin/notify-jobs' element={<AdminRoute><AdminNotifyJobs /></AdminRoute>} />
-          <Route path='/admin/notify-analytics' element={<AdminRoute><AdminNotifyAnalytics /></AdminRoute>} />
+          <Route path='/admin/analytics' element={<AdminRoute><AdminNotifyAnalytics /></AdminRoute>} />
+          <Route path='/admin/feedback' element={<AdminRoute><AdminFeedback /></AdminRoute>} />
+          <Route path='/feedback' element={<ProtectedRoute><FeedbackPage /></ProtectedRoute>} />
+          <Route path='/admin/daily-data' element={<AdminRoute><AdminDailyData /></AdminRoute>} />
           <Route path='/notifications' element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
         </Routes>
       </div>

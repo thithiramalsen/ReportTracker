@@ -1,0 +1,124 @@
+import React, { useEffect, useState } from 'react'
+import API from '../api'
+import { useToast } from '../components/Toast'
+
+export default function AdminDailyData(){
+  const [date, setDate] = useState('')
+  const [liters, setLiters] = useState('')
+  const [dryKilos, setDryKilos] = useState('')
+  const [metrolac, setMetrolac] = useState('')
+  const [division, setDivision] = useState('')
+  const [list, setList] = useState([])
+  const [codes, setCodes] = useState([])
+  const [editing, setEditing] = useState(null)
+  const toast = useToast()
+
+  const load = async () => {
+    try {
+      const res = await API.get('/daily-data')
+      setList(res.data)
+    } catch (e) { console.error(e); try { toast.show('Failed to load', 'error') } catch(e){} }
+  }
+
+  useEffect(()=>{ load() }, [])
+  useEffect(()=>{
+    let mounted = true
+    API.get('/codes').then(res => { if (mounted) setCodes(res.data) }).catch(()=>{})
+    return ()=>{ mounted = false }
+  }, [])
+
+  const submit = async (e) => {
+    e && e.preventDefault()
+    try {
+      const payload = { date, liters: Number(liters||0), dryKilos: Number(dryKilos||0), metrolac: Number(metrolac||0), division }
+      if (editing) {
+        await API.patch(`/daily-data/${editing._id}`, payload)
+        try { toast.show('Updated', 'success') } catch(e){}
+        setEditing(null)
+      } else {
+        await API.post('/daily-data', payload)
+        try { toast.show('Created', 'success') } catch(e){}
+      }
+      setDate(''); setLiters(''); setDryKilos(''); setMetrolac(''); setDivision('')
+      load()
+    } catch (err) {
+      console.error(err)
+      try { toast.show(err?.response?.data?.message || 'Save failed', 'error') } catch(e){}
+    }
+  }
+
+  const edit = (item) => {
+    setEditing(item)
+    setDate(new Date(item.date).toISOString().slice(0,10))
+    setLiters(item.liters||'')
+    setDryKilos(item.dryKilos||'')
+    setMetrolac(item.metrolac||'')
+    setDivision(item.division||'')
+  }
+
+  const remove = async (id) => {
+    if (!confirm('Delete entry?')) return
+    try {
+      await API.delete(`/daily-data/${id}`)
+      try { toast.show('Deleted', 'success') } catch(e){}
+      load()
+    } catch (e) { console.error(e); try { toast.show('Delete failed', 'error') } catch(e){} }
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto mt-6">
+      <h3 className="text-xl mb-4">Admin — Daily DRC Data</h3>
+      <form onSubmit={submit} className="grid grid-cols-2 gap-3 mb-4">
+        <div>
+          <label className="block text-sm">Date</label>
+          <input type="date" value={date} onChange={e=>setDate(e.target.value)} className="w-full" />
+        </div>
+        <div>
+          <label className="block text-sm">Division</label>
+          <select value={division} onChange={e=>setDivision(e.target.value)} className="w-full border p-2 rounded">
+            <option value="">— Select division —</option>
+            {codes.map(c => (
+              <option key={c._id} value={c.code}>{c.code}{c.label ? ` — ${c.label}` : ''}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm">Liters</label>
+          <input value={liters} onChange={e=>setLiters(e.target.value)} className="w-full" />
+        </div>
+        <div>
+          <label className="block text-sm">Dry kilos</label>
+          <input value={dryKilos} onChange={e=>setDryKilos(e.target.value)} className="w-full" />
+        </div>
+        <div>
+          <label className="block text-sm">Metrolac</label>
+          <input value={metrolac} onChange={e=>setMetrolac(e.target.value)} className="w-full" />
+        </div>
+        <div className="flex items-end">
+          <button className="btn" type="submit">{editing ? 'Update' : 'Create'}</button>
+        </div>
+      </form>
+
+      <div className="card">
+        <h4 className="font-medium mb-2">Recent Entries</h4>
+        {list.length===0 ? <div className="text-sm text-gray-500">No entries</div> : (
+          <div className="space-y-2">
+            {list.map(item => (
+              <div key={item._id} className="flex justify-between items-center p-2 border rounded">
+                <div>
+                  <div className="font-medium">{new Date(item.date).toLocaleDateString()} — {item.division}</div>
+                  <div className="text-sm text-gray-600">Liters: {item.liters} • Dry Kilos: {item.dryKilos} • Metrolac: {item.metrolac}</div>
+                  <div className="text-xs text-gray-500">By: {item.createdBy ? item.createdBy.name : '—'}</div>
+                </div>
+                <div className="flex gap-2">
+                  <button className="px-2 py-1 border rounded" onClick={()=>edit(item)}>Edit</button>
+                  <button className="px-2 py-1 bg-red-600 text-white rounded" onClick={()=>remove(item._id)}>Delete</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
