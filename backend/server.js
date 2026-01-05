@@ -16,6 +16,7 @@ const notifyJobsRoutes = require('./routes/notifyJobs');
 const notifylk = require('./utils/notifylk');
 const dailyDataRoutes = require('./routes/dailyDataRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const feedbackRoutes = require('./routes/feedbackRoutes');
 
 // logging middleware
 const logger = require('./middleware/logger');
@@ -43,6 +44,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/notify', notifyJobsRoutes);
 app.use('/api/daily-data', dailyDataRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/feedback', feedbackRoutes);
 
 // Root route: helpful landing or redirect to frontend app
 app.get('/', (req, res) => {

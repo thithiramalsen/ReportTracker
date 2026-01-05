@@ -16,6 +16,7 @@ export default function UploadPage() {
   const [editingReport, setEditingReport] = useState(null)
   const toast = useToast()
   const [isUploading, setIsUploading] = useState(false)
+  const user = JSON.parse(localStorage.getItem('user') || 'null')
 
   useEffect(() => {
     API.get('/users')
@@ -204,6 +205,9 @@ export default function UploadPage() {
                   <button title="Copy login link" onClick={()=>copyLink(r._id)} className="px-2 py-1 border rounded" aria-label="copy-link"><Clipboard className="w-4 h-4"/></button>
                   <button title="Edit Assignments" onClick={()=>setEditingReport(r)} className="px-2 py-1 border rounded" aria-label="edit"><Edit3 className="w-4 h-4"/></button>
                   <button title="Delete" onClick={()=>removeReport(r._id)} className="px-2 py-1 border rounded text-red-600" aria-label="delete"><Trash2 className="w-4 h-4"/></button>
+                  {user?.role === 'admin' && (
+                    <a title="Comments" href={`/admin/feedback?reportId=${r._id}`} className="px-2 py-1 border rounded text-sm">Comments</a>
+                  )}
                 </div>
               </div>
             ))}

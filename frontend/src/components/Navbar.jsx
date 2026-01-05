@@ -60,15 +60,18 @@ export default function Navbar() {
 
         {user ? (
           <>
-            <Link className="flex items-center gap-3" to="/notifications">
+            <Link className="text-sm text-gray-700 hover:text-gray-900 mr-3" to={user?.role === 'admin' ? '/admin/feedback' : '/feedback'}>Feedback</Link>
+
+            <Link className="flex items-center gap-2" to="/settings"><User className="w-5 h-5 text-gray-600"/>
+              <span className="text-sm text-gray-700">{user.name}</span>
+            </Link>
+
+            <Link className="flex items-center gap-3 ml-2" to="/notifications">
               <Bell className="w-5 h-5 text-gray-600"/>
               {unread>0 && <span className="-ml-3 mt-0.5 inline-flex items-center justify-center w-5 h-5 bg-red-600 text-white text-xs rounded-full">{unread}</span>}
             </Link>
 
-            <Link className="flex items-center gap-2 ml-2" to="/settings"><User className="w-5 h-5 text-gray-600"/>
-              <span className="text-sm text-gray-700">{user.name}</span>
-            </Link>
-            <button className="px-3 py-1 bg-red-50 text-red-600 rounded flex items-center gap-2" onClick={logout}><LogOut className="w-4 h-4"/>Logout</button>
+            <button className="px-3 py-1 bg-red-50 text-red-600 rounded flex items-center gap-2 ml-3" onClick={logout}><LogOut className="w-4 h-4"/>Logout</button>
           </>
         ) : (
           <>
