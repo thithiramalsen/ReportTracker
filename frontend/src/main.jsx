@@ -1,6 +1,6 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import App from './App'
 import LoginPage from './pages/LoginPage'
 import Dashboard from './pages/Dashboard'
@@ -27,11 +27,24 @@ import AdminRoute from './components/AdminRoute'
 
 import './styles.css'
 
+function NormalizePath(){
+  const location = useLocation()
+  const navigate = useNavigate()
+  React.useEffect(()=>{
+    if (location.pathname.startsWith('//')) {
+      const fixed = location.pathname.replace(/^\/+/, '/') || '/'
+      navigate({ pathname: fixed, search: location.search }, { replace: true })
+    }
+  }, [location.pathname, location.search, navigate])
+  return null
+}
+
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
       <ToastProvider>
       <div>
+        <NormalizePath />
         <Navbar />
         <Routes>
           <Route path='/' element={<Navigate to="/dashboard" replace />} />
