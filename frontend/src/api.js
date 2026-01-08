@@ -17,4 +17,22 @@ API.interceptors.request.use((config) => {
   return config;
 });
 
+// Handle 401 responses globally: clear auth and redirect to login
+API.interceptors.response.use((r) => r, (error) => {
+  const resp = error && error.response;
+  try {
+    const reqUrl = error.config && (error.config.url || '');
+    // ignore auth endpoints (login/forgot/reset) to avoid loops
+    if (resp && resp.status === 401 && !/auth\/(login|forgot|reset)/.test(reqUrl)) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      // slight delay to allow any UI cleanup, then navigate
+      setTimeout(() => { window.location.href = '/login'; }, 50);
+    }
+  } catch (e) {
+    // swallow
+  }
+  return Promise.reject(error);
+});
+
 export default API;
