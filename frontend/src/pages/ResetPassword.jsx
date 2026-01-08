@@ -1,14 +1,20 @@
 import React, { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { Eye, EyeOff } from 'lucide-react'
 import API from '../api'
 
 export default function ResetPassword(){
   const { token } = useParams()
   const navigate = useNavigate()
+  // Also support ?code=... query param in addition to /reset/:token
+  const urlCode = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('code') : ''
+  const initialCode = urlCode || token || ''
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
-  const [code, setCode] = useState(token || '')
+  const [code, setCode] = useState(initialCode)
   const [status, setStatus] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
 
   const submit = async (e) => {
     e.preventDefault()
@@ -32,11 +38,21 @@ export default function ResetPassword(){
           </div>
           <div>
             <label className="block text-sm">New password</label>
-            <input type="password" value={password} onChange={e=>setPassword(e.target.value)} className="w-full border p-2 rounded mt-1" />
+            <div className="mt-1 relative">
+              <input type={showPassword ? 'text' : 'password'} value={password} onChange={e=>setPassword(e.target.value)} className="w-full border p-2 rounded" />
+              <button type="button" className="absolute right-2 top-2 text-gray-600" onClick={()=>setShowPassword(s=>!s)} aria-label="Toggle password visibility">
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
           <div>
             <label className="block text-sm">Confirm password</label>
-            <input type="password" value={confirm} onChange={e=>setConfirm(e.target.value)} className="w-full border p-2 rounded mt-1" />
+            <div className="mt-1 relative">
+              <input type={showConfirm ? 'text' : 'password'} value={confirm} onChange={e=>setConfirm(e.target.value)} className="w-full border p-2 rounded" />
+              <button type="button" className="absolute right-2 top-2 text-gray-600" onClick={()=>setShowConfirm(s=>!s)} aria-label="Toggle confirm password visibility">
+                {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button className="px-4 py-2 bg-green-600 text-white rounded">Set password</button>

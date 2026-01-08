@@ -117,3 +117,57 @@ router.get('/last12', verifyToken, requireRole('admin'), async (req, res) => {
 });
 
 module.exports = router;
+
+// Daily aggregates between a date range. Query params:
+//  - start (ISO date) default: 30 days ago
+//  - end (ISO date) default: today
+//  - division (optional) to filter
+//  - breakdown=1 to return per-day-per-division rows
+router.get('/daily', verifyToken, requireRole('admin'), async (req, res) => {
+  try {
+    const { start: s, end: e, division, breakdown } = req.query;
+    const endDate = e ? new Date(e) : new Date();
+    // normalize end to include the full day
+    endDate.setHours(23,59,59,999);
+    const startDate = s ? new Date(s) : new Date(Date.now() - (30 * 24 * 60 * 60 * 1000));
+
+    const match = { date: { $gte: startDate, $lte: endDate } };
+    if (division) match.division = division;
+
+    if (breakdown && String(breakdown) === '1') {
+      // return per-day, per-division rows
+      const pipeline = [
+        { $match: match },
+        { $group: {
+            _id: { year: { $year: '$date' }, month: { $month: '$date' }, day: { $dayOfMonth: '$date' }, division: '$division' },
+            liters: { $sum: '$liters' },
+            dryKilos: { $sum: '$dryKilos' },
+            metrolacAvg: { $avg: '$metrolac' }
+        }},
+        { $project: { date: { $dateFromParts: { year: '$_id.year', month: '$_id.month', day: '$_id.day' } }, division: '$_id.division', liters:1, dryKilos:1, metrolacAvg:1, _id:0 } },
+        { $sort: { date: 1, division: 1 } }
+      ];
+      const rows = await DailyData.aggregate(pipeline);
+      return res.json({ start: startDate, end: endDate, breakdown: true, data: rows });
+    }
+
+    // default: aggregate per day (totals across divisions unless filtered)
+    const pipeline = [
+      { $match: match },
+      { $group: {
+          _id: { year: { $year: '$date' }, month: { $month: '$date' }, day: { $dayOfMonth: '$date' } },
+          liters: { $sum: '$liters' },
+          dryKilos: { $sum: '$dryKilos' },
+          metrolacAvg: { $avg: '$metrolac' }
+      }},
+      { $project: { date: { $dateFromParts: { year: '$_id.year', month: '$_id.month', day: '$_id.day' } }, liters:1, dryKilos:1, metrolacAvg:1, _id:0 } },
+      { $sort: { date: 1 } }
+    ];
+
+    const rows = await DailyData.aggregate(pipeline);
+    res.json({ start: startDate, end: endDate, breakdown: false, data: rows });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
