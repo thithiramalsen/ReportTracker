@@ -20,6 +20,10 @@ function formatMonthLabel(y,m){ return `${String(m).padStart(2,'0')}/${String(y)
 export default function AdminAnalytics(){
   const [smsStats, setSmsStats] = useState(null)
   const [drcStats, setDrcStats] = useState(null)
+  const [dailyStats, setDailyStats] = useState(null)
+  const [startDate, setStartDate] = useState(() => { const d = new Date(); d.setDate(d.getDate()-30); return d.toISOString().slice(0,10)} )
+  const [endDate, setEndDate] = useState(() => new Date().toISOString().slice(0,10))
+  const [breakdown, setBreakdown] = useState(false)
   const [compare, setCompare] = useState(null)
   const [division, setDivision] = useState('')
   const [codes, setCodes] = useState([])
@@ -37,9 +41,18 @@ export default function AdminAnalytics(){
     try { const res = await API.get(`/analytics/compare?year=${yr}&month=${m}${div?`&division=${encodeURIComponent(div)}`:''}`); setCompare(res.data) } catch(e){ console.error(e) }
   }
 
+  const loadDaily = async (s = startDate, e = endDate, div = division, br = breakdown) => {
+    try {
+      const q = `?start=${encodeURIComponent(s)}&end=${encodeURIComponent(e)}${div?`&division=${encodeURIComponent(div)}`:''}${br?`&breakdown=1`:''}`
+      const res = await API.get(`/analytics/daily${q}`)
+      setDailyStats(res.data)
+    } catch (err) { console.error(err) }
+  }
+
   useEffect(()=>{
     loadSms();
     loadDrc('', year);
+    loadDaily();
     API.get('/codes').then(r=>setCodes(r.data)).catch(()=>{})
     const cur = new Date(); loadCompare(cur.getFullYear(), cur.getMonth()+1, '')
   }, [])
@@ -111,6 +124,28 @@ export default function AdminAnalytics(){
 
       {tab === 'drc' && (
         <>
+          <div className="card p-4">
+            <div className="flex gap-3 items-end mb-3">
+              <div>
+                <label className="text-xs text-gray-500">Start</label>
+                <input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} className="border p-1 rounded" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500">End</label>
+                <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} className="border p-1 rounded" />
+              </div>
+              <div className="flex items-center gap-2">
+                <input id="breakdown" type="checkbox" checked={breakdown} onChange={e=>setBreakdown(e.target.checked)} />
+                <label htmlFor="breakdown" className="text-sm">Division breakdown</label>
+              </div>
+              <div>
+                <button onClick={()=>loadDaily(startDate,endDate,division,breakdown)} className="px-3 py-1 bg-blue-600 text-white rounded">Refresh</button>
+              </div>
+            </div>
+            <div className="text-sm text-gray-600 mb-2">Showing daily data from <strong>{startDate}</strong> to <strong>{endDate}</strong>{division?` for ${division}`:''}</div>
+            {dailyStats && !dailyStats.data && <div>Loading daily data...</div>}
+          </div>
+
           <div className="grid grid-cols-3 gap-4">
             <SummaryCard title={`SMS sent (last period)`} value={smsStats.sent || 0} delta={smsStats.sent - (smsStats.prevSent||0)} />
             <SummaryCard title={`Liters (${curMonthLabel})`} value={litersData[litersData.length-1] || 0} delta={(litersData[litersData.length-1]||0) - (litersData[litersData.length-2]||0)} />
@@ -126,6 +161,40 @@ export default function AdminAnalytics(){
             <h3 className="text-lg mb-2">Metrolac (monthly avg)</h3>
             <Line options={{ responsive: true }} data={lineData} />
           </div>
+
+          {/* Daily charts section */}
+          {dailyStats && (
+            <div className="card p-4">
+              <h3 className="text-lg mb-2">Daily Detail</h3>
+              {!dailyStats.breakdown && (
+                (() => {
+                  const labels = (dailyStats.data||[]).map(r => new Date(r.date).toLocaleDateString())
+                  const liters = (dailyStats.data||[]).map(r => r.liters || 0)
+                  const dry = (dailyStats.data||[]).map(r => r.dryKilos || 0)
+                  const met = (dailyStats.data||[]).map(r => r.metrolacAvg || 0)
+                  const dailyLine = { labels, datasets: [ { label: 'Liters', data: liters, borderColor: 'rgba(59,130,246,0.9)', backgroundColor: 'rgba(59,130,246,0.2)' }, { label: 'Dry Kilos', data: dry, borderColor: 'rgba(34,197,94,0.9)', backgroundColor: 'rgba(34,197,94,0.2)' }, { label: 'Metrolac (avg)', data: met, borderColor: 'rgba(234,88,12,0.9)', backgroundColor: 'rgba(234,88,12,0.2)' } ] }
+                  return <Line options={{ responsive:true }} data={dailyLine} />
+                })()
+              )}
+
+              {dailyStats.breakdown && (
+                (() => {
+                  const rows = dailyStats.data || []
+                  const labels = Array.from(new Set(rows.map(r => new Date(r.date).toLocaleDateString()))).sort((a,b)=> new Date(a)-new Date(b))
+                  const divisions = Array.from(new Set(rows.map(r => r.division || ''))).sort()
+                  const datasets = divisions.map((div, idx) => {
+                    const map = Object.fromEntries(rows.filter(r=> (r.division||'')===div).map(r => [new Date(r.date).toLocaleDateString(), r.liters || 0]))
+                    const data = labels.map(l => map[l] || 0)
+                    const color = [`rgba(59,130,246,0.9)`,`rgba(34,197,94,0.9)`,`rgba(234,88,12,0.9)`,`rgba(168,85,247,0.9)`][idx % 4]
+                    return { label: div || 'Unknown', data, backgroundColor: color }
+                  })
+                  const bar = { labels, datasets }
+                  const opts = { responsive:true, plugins:{ legend:{ position:'top' } }, scales: { x: { stacked: true }, y: { stacked: true } } }
+                  return <Bar options={opts} data={bar} />
+                })()
+              )}
+            </div>
+          )}
         </>
       )}
 
