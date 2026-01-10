@@ -1,0 +1,14 @@
+users should also be able to enter daily data
+analyticss should be updated. to be able to view data by each user as well as divisons
+admins should be able to assign or unassign users from divisions
+
+new data entry format for all users and admins
+2.supplier code
+3.metrolac reading
+4.dry kilos 
+5.NH3 volume
+6.TMTD Volume
+
+and users should also be able to 
+
+Opening link issue from an unsigned browser
