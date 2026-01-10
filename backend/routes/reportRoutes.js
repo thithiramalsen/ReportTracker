@@ -91,6 +91,8 @@ function s3FilenameFromKey(key) {
 router.post('/', verifyToken, requireRole('admin'), upload.single('file'), async (req, res) => {
   try {
     const { title, description, reportDate, userIds } = req.body;
+    // allow optional flag to control SMS notifications for this upload
+    const sendSmsFlag = (req.body.sendSms === 'true' || req.body.sendSms === true || req.body.sendSms === '1');
     if (!title || !reportDate || !req.file) return res.status(400).json({ message: 'Missing fields' });
 
     let fileUrl = '';
@@ -176,9 +178,13 @@ router.post('/', verifyToken, requireRole('admin'), upload.single('file'), async
         console.error('Failed to create notifications for users', e.message);
       }
 
-      // non-blocking notifications: WhatsApp + SMS (notify.lk)
+      // non-blocking notifications: WhatsApp always, SMS only if enabled for this upload
       try { notifyWhatsApp({ report, users: assignedUsers }).catch(err => console.error('whatsapp notify failed', err.message)); } catch(e) { console.error('whatsapp notify invocation failed', e.message) }
-      try { notifySms({ report, users: assignedUsers }).catch(err => console.error('notifylk sms failed', err.message)); } catch(e) { console.error('notifylk notify invocation failed', e.message) }
+      if (sendSmsFlag) {
+        try { notifySms({ report, users: assignedUsers }).catch(err => console.error('notifylk sms failed', err.message)); } catch(e) { console.error('notifylk notify invocation failed', e.message) }
+      } else {
+        console.log('[REPORTS][UPLOAD] sms notifications suppressed for this upload');
+      }
     }
 
     res.status(201).json({ message: 'Report uploaded', report });

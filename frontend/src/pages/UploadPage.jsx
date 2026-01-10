@@ -17,6 +17,9 @@ export default function UploadPage() {
   const [reports, setReports] = useState([])
   const [editingReport, setEditingReport] = useState(null)
   const [pendingDelete, setPendingDelete] = useState(null)
+  const [sendSms, setSendSms] = useState(() => {
+    try { return localStorage.getItem('upload_sendSms') !== 'false' } catch(e){ return true }
+  })
   const toast = useToast()
   const [isUploading, setIsUploading] = useState(false)
   const user = JSON.parse(localStorage.getItem('user') || 'null')
@@ -30,6 +33,11 @@ export default function UploadPage() {
     API.get('/codes').then(res => setCodes(res.data)).catch(()=>{})
     fetchReports()
   }, [])
+
+  // persist sendSms preference
+  useEffect(()=>{
+    try { localStorage.setItem('upload_sendSms', sendSms ? 'true' : 'false') } catch(e){}
+  }, [sendSms])
 
   const fetchReports = async () => {
     try {
@@ -67,6 +75,7 @@ export default function UploadPage() {
     form.append('reportDate', reportDate)
     form.append('file', file)
     if (selectedCodes && selectedCodes.length) form.append('codes', JSON.stringify(selectedCodes))
+    form.append('sendSms', sendSms ? 'true' : 'false')
 
     try {
       await API.post('/reports', form, { headers: { 'Content-Type': 'multipart/form-data' } })
@@ -173,8 +182,24 @@ export default function UploadPage() {
         <div className="mt-3">
           <label className="block text-sm">File (PDF)</label>
           <input disabled={isUploading} type="file" accept="application/pdf" onChange={e=>setFile(e.target.files[0])} className="mt-1" />
-          {file && <div className="text-sm text-gray-600 mt-1">Selected: {file.name}</div>}
+          {file && (
+            <div className="flex items-center gap-3 mt-1">
+              <div className="text-sm text-gray-600">Selected: {file.name}</div>
+              <div className="text-xs text-gray-500">({(file.size/1024).toFixed(1)} KB)</div>
+              <button type="button" className="ml-2 text-sm text-red-600" onClick={()=>setFile(null)}>Remove</button>
+            </div>
+          )}
           {errors.file && <div className="text-xs text-red-600 mt-1">{errors.file}</div>}
+        </div>
+
+        <div className="mt-3 flex items-center gap-3">
+          <label htmlFor="sendSms" className="flex items-center cursor-pointer select-none">
+            <div className={`w-10 h-6 flex items-center rounded-full p-1 transition-colors ${sendSms ? 'bg-green-500' : 'bg-gray-300'}`}>
+              <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${sendSms ? 'translate-x-4' : 'translate-x-0'}`} />
+            </div>
+            <span className="ml-3 text-sm">Send SMS notifications to assigned users</span>
+          </label>
+          <input id="sendSms" type="checkbox" className="hidden" checked={sendSms} onChange={e=>setSendSms(e.target.checked)} />
         </div>
 
         <div className="mt-3">
@@ -185,6 +210,11 @@ export default function UploadPage() {
             ))}
           </select>
           <div className="text-xs text-gray-500 mt-1">Select division codes to assign everyone in those divisions.</div>
+          {selectedCodes && selectedCodes.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {selectedCodes.map(c => <div key={c} className="px-2 py-1 bg-gray-100 rounded text-sm">{c}</div>)}
+            </div>
+          )}
         </div>
 
         <button disabled={isUploading} className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded" type="submit">

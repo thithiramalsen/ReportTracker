@@ -5,6 +5,7 @@ import { useToast } from '../components/Toast'
 
 function ReportCard({ r }) {
   const user = JSON.parse(localStorage.getItem('user') || 'null')
+  const toast = useToast()
 
   function timeAgo(d) {
     if (!d) return ''
@@ -16,7 +17,6 @@ function ReportCard({ r }) {
   }
 
   const openReport = async (id) => {
-    const toast = useToast()
     try {
       console.log('[UI] download token', localStorage.getItem('token'))
       const resp = await API.get(`/reports/${id}/download`, { responseType: 'blob' })
