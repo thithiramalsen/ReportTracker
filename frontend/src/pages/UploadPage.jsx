@@ -8,6 +8,7 @@ export default function UploadPage() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [reportDate, setReportDate] = useState('')
+  const [errors, setErrors] = useState({})
   const [file, setFile] = useState(null)
   const [users, setUsers] = useState([])
   const [codes, setCodes] = useState([])
@@ -21,6 +22,8 @@ export default function UploadPage() {
   const user = JSON.parse(localStorage.getItem('user') || 'null')
 
   useEffect(() => {
+    // Prefill report date with today for convenience
+    if (!reportDate) setReportDate(new Date().toISOString().slice(0,10))
     API.get('/users')
       .then(res => setUsers(res.data))
       .catch(err => console.error(err))
@@ -41,7 +44,20 @@ export default function UploadPage() {
 
   const submit = async (e) => {
     e.preventDefault()
-    if (!file) return tryToast('Select PDF', 'error')
+    // client-side validations
+    const newErrors = {}
+    if (!title || !String(title).trim()) newErrors.title = 'Title is required'
+    if (!reportDate) newErrors.reportDate = 'Report date is required'
+    // validate date
+    if (reportDate && Number.isNaN(new Date(reportDate).getTime())) newErrors.reportDate = 'Invalid date'
+    if (!file) newErrors.file = 'Select a PDF file'
+    else if (file && file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) newErrors.file = 'File must be a PDF'
+    else if (file && file.size > 25 * 1024 * 1024) newErrors.file = 'File must be under 25MB'
+    setErrors(newErrors)
+    if (Object.keys(newErrors).length) {
+      const first = Object.values(newErrors)[0]
+      return tryToast(first, 'error')
+    }
 
     setIsUploading(true)
 
@@ -60,7 +76,7 @@ export default function UploadPage() {
       // clear form
       setTitle('')
       setDescription('')
-      setReportDate('')
+      setReportDate(new Date().toISOString().slice(0,10))
       setFile(null)
       setSelected([])
       setSelectedCodes([])
@@ -143,6 +159,7 @@ export default function UploadPage() {
         <div>
           <label className="block text-sm">Title</label>
           <input value={title} onChange={e=>setTitle(e.target.value)} className="w-full border p-2 rounded mt-1" />
+          {errors.title && <div className="text-xs text-red-600 mt-1">{errors.title}</div>}
         </div>
         <div className="mt-3">
           <label className="block text-sm">Description</label>
@@ -151,11 +168,13 @@ export default function UploadPage() {
         <div className="mt-3">
           <label className="block text-sm">Report Date</label>
           <input type="date" value={reportDate} onChange={e=>setReportDate(e.target.value)} className="w-full border p-2 rounded mt-1" />
+          {errors.reportDate && <div className="text-xs text-red-600 mt-1">{errors.reportDate}</div>}
         </div>
         <div className="mt-3">
           <label className="block text-sm">File (PDF)</label>
           <input disabled={isUploading} type="file" accept="application/pdf" onChange={e=>setFile(e.target.files[0])} className="mt-1" />
           {file && <div className="text-sm text-gray-600 mt-1">Selected: {file.name}</div>}
+          {errors.file && <div className="text-xs text-red-600 mt-1">{errors.file}</div>}
         </div>
 
         <div className="mt-3">
