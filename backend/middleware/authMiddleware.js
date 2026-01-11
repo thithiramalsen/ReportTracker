@@ -13,8 +13,10 @@ authMiddleware.verifyToken = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    // Attach user info
-    req.user = { id: decoded.id, role: decoded.role };
+    // Attach user info (include code and name for convenience)
+    const user = await User.findById(decoded.id).select('role code name');
+    if (!user) return res.status(401).json({ message: 'User not found' });
+    req.user = { id: user._id, role: user.role, code: user.code, name: user.name };
     next();
   } catch (err) {
     return res.status(401).json({ message: 'Invalid token' });
