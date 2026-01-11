@@ -10,13 +10,12 @@ router.get('/monthly', verifyToken, requireRole('admin'), async (req, res) => {
     const year = parseInt(req.query.year, 10) || (new Date()).getFullYear();
     const division = req.query.division;
     const user = req.query.user; // optional createdBy filter
+    const userId = user && mongoose.isValidObjectId(user) ? new mongoose.Types.ObjectId(user) : null;
     const start = new Date(year, 0, 1);
     const end = new Date(year + 1, 0, 1);
     const match = { date: { $gte: start, $lt: end } };
     if (division) match.division = division;
-    if (user) {
-      try { match.createdBy = mongoose.Types.ObjectId(user); } catch(e) { /* ignore invalid id */ }
-    }
+    if (userId) match.createdBy = userId;
 
     const pipeline = [
       { $match: match },
@@ -51,6 +50,7 @@ router.get('/compare', verifyToken, requireRole('admin'), async (req, res) => {
     const month = parseInt(req.query.month, 10) || ((new Date()).getMonth() + 1);
     const division = req.query.division;
     const user = req.query.user;
+    const userId = user && mongoose.isValidObjectId(user) ? new mongoose.Types.ObjectId(user) : null;
 
     const getRange = (y, m) => {
       const mm = m - 1; // JS Date month index
@@ -69,9 +69,7 @@ router.get('/compare', verifyToken, requireRole('admin'), async (req, res) => {
     const buildMatch = (range) => {
       const m = { date: { $gte: range.start, $lt: range.end } };
       if (division) m.division = division;
-      if (user) {
-        try { m.createdBy = mongoose.Types.ObjectId(user); } catch(e) { }
-      }
+      if (userId) m.createdBy = userId;
       return m;
     };
 
@@ -96,16 +94,17 @@ router.get('/compare', verifyToken, requireRole('admin'), async (req, res) => {
 // Last 12 months totals (rolling)
 router.get('/last12', verifyToken, requireRole('admin'), async (req, res) => {
   try {
+    console.log('GET /analytics/last12', req.query);
+    res.set('Cache-Control', 'no-store');
     const division = req.query.division;
     const user = req.query.user;
+    const userId = user && mongoose.isValidObjectId(user) ? new mongoose.Types.ObjectId(user) : null;
     const now = new Date();
     const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     const start = new Date(end.getFullYear(), end.getMonth() - 12, 1);
     const match = { date: { $gte: start, $lt: end } };
     if (division) match.division = division;
-    if (user) {
-      try { match.createdBy = mongoose.Types.ObjectId(user); } catch(e) { }
-    }
+    if (userId) match.createdBy = userId;
 
     const rows = await DailyData.aggregate([
       { $match: match },
@@ -113,6 +112,7 @@ router.get('/last12', verifyToken, requireRole('admin'), async (req, res) => {
       { $project: { year: '$_id.year', month: '$_id.month', liters:1, dryKilos:1, metrolacAvg:1, nh3Volume:1, tmtDVolume:1, _id:0 } },
       { $sort: { year: 1, month: 1 } }
     ]);
+    console.log('last12 match', match, 'rows', rows.length);
 
     // build list of last 12 months
     const out = [];
@@ -140,7 +140,10 @@ module.exports = router;
 //  - breakdown=1 to return per-day-per-division rows
 router.get('/daily', verifyToken, requireRole('admin'), async (req, res) => {
   try {
+    console.log('GET /analytics/daily', req.query);
+    res.set('Cache-Control', 'no-store');
     const { start: s, end: e, division, breakdown, user } = req.query;
+    const userId = user && mongoose.isValidObjectId(user) ? new mongoose.Types.ObjectId(user) : null;
     const endDate = e ? new Date(e) : new Date();
     // normalize end to include the full day
     endDate.setHours(23,59,59,999);
@@ -148,9 +151,7 @@ router.get('/daily', verifyToken, requireRole('admin'), async (req, res) => {
 
     const match = { date: { $gte: startDate, $lte: endDate } };
     if (division) match.division = division;
-    if (user) {
-      try { match.createdBy = mongoose.Types.ObjectId(user); } catch (err) { /* ignore invalid id */ }
-    }
+    if (userId) match.createdBy = userId;
 
     if (breakdown && String(breakdown) === '1') {
       // return per-day, per-division rows
@@ -168,6 +169,7 @@ router.get('/daily', verifyToken, requireRole('admin'), async (req, res) => {
         { $sort: { date: 1, division: 1 } }
       ];
       const rows = await DailyData.aggregate(pipeline);
+      console.log('daily breakdown match', match, 'rows', rows.length);
       return res.json({ start: startDate, end: endDate, breakdown: true, data: rows });
     }
 
@@ -187,6 +189,7 @@ router.get('/daily', verifyToken, requireRole('admin'), async (req, res) => {
     ];
 
     const rows = await DailyData.aggregate(pipeline);
+    console.log('daily total match', match, 'rows', rows.length);
     res.json({ start: startDate, end: endDate, breakdown: false, data: rows });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });

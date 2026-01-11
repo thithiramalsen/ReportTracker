@@ -34,32 +34,55 @@ export default function AdminAnalytics(){
   const [tab, setTab] = useState('drc')
 
   const loadSms = async ()=>{
-    try { const res = await API.get('/notify/analytics'); setSmsStats(res.data) } catch(e){ console.error(e) }
+    console.debug('loadSms');
+    try { const res = await API.get('/notify/analytics'); setSmsStats(res.data) } catch(e){ console.error('loadSms error', e) }
   }
   const loadDrc = async (div, yr, user) =>{
     try {
       const u = user !== undefined ? user : userFilter
-      const qs = `${div?`division=${encodeURIComponent(div)}`:''}${u?`${div?'&':''}user=${encodeURIComponent(u)}`:''}`
-      const res = await API.get(`/analytics/last12${qs?`?${qs}`:''}`);
+      console.debug('loadDrc', { division: div, year: yr, user: u })
+      const parts = []
+      if (div) parts.push(`division=${encodeURIComponent(div)}`)
+      if (u) parts.push(`user=${encodeURIComponent(u)}`)
+      parts.push(`_=${Date.now()}`)
+      const qs = parts.join('&')
+      const res = await API.get(`/analytics/last12?${qs}`);
+      console.debug('loadDrc response', res.data)
       setDrcStats(res.data)
-    } catch(e){ console.error(e) }
+    } catch(e){ console.error('loadDrc error', e) }
   }
   const loadCompare = async (yr, m, div, user) => {
     try {
       const u = user !== undefined ? user : userFilter
-      const qs = `year=${yr}&month=${m}${div?`&division=${encodeURIComponent(div)}`:''}${u?`&user=${encodeURIComponent(u)}`:''}`
+      console.debug('loadCompare', { year: yr, month: m, division: div, user: u })
+      const parts = [`year=${yr}`, `month=${m}`]
+      if (div) parts.push(`division=${encodeURIComponent(div)}`)
+      if (u) parts.push(`user=${encodeURIComponent(u)}`)
+      parts.push(`_=${Date.now()}`)
+      const qs = parts.join('&')
       const res = await API.get(`/analytics/compare?${qs}`);
+      console.debug('loadCompare response', res.data)
       setCompare(res.data)
-    } catch(e){ console.error(e) }
+    } catch(e){ console.error('loadCompare error', e) }
   }
 
   const loadDaily = async (s = startDate, e = endDate, div = division, br = breakdown, user) => {
     try {
       const u = user !== undefined ? user : userFilter
-      const q = `?start=${encodeURIComponent(s)}&end=${encodeURIComponent(e)}${div?`&division=${encodeURIComponent(div)}`:''}${u?`&user=${encodeURIComponent(u)}`:''}${br?`&breakdown=1`:''}`
+      console.debug('loadDaily', { start: s, end: e, division: div, breakdown: br, user: u })
+      const parts = [
+        `start=${encodeURIComponent(s)}`,
+        `end=${encodeURIComponent(e)}`
+      ]
+      if (div) parts.push(`division=${encodeURIComponent(div)}`)
+      if (u) parts.push(`user=${encodeURIComponent(u)}`)
+      if (br) parts.push('breakdown=1')
+      parts.push(`_=${Date.now()}`)
+      const q = `?${parts.join('&')}`
       const res = await API.get(`/analytics/daily${q}`)
+      console.debug('loadDaily response size', { count: (res.data?.data || []).length, breakdown: res.data?.breakdown })
       setDailyStats(res.data)
-    } catch (err) { console.error(err) }
+    } catch (err) { console.error('loadDaily error', err) }
   }
 
   useEffect(()=>{
@@ -72,6 +95,7 @@ export default function AdminAnalytics(){
   }, [])
 
   useEffect(() => {
+    console.debug('filters changed', { division, userFilter })
     const now = new Date();
     loadDrc(division, year, userFilter);
     loadDaily(startDate, endDate, division, breakdown, userFilter);
