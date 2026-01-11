@@ -53,6 +53,13 @@ export default function Navbar() {
           </>
         )}
 
+        {user && user.role !== 'admin' && (
+          <>
+            <Link className="flex items-center gap-1 text-sm text-white bg-green-600 hover:bg-green-700 px-3 py-1 rounded" to="/daily-data">Daily Data</Link>
+            <Link className="flex items-center gap-1 text-sm text-white bg-gray-700 hover:bg-gray-800 px-3 py-1 rounded ml-2" to="/my-daily-data">My Entries</Link>
+          </>
+        )}
+
         {user?.role === 'admin' && <Link className="text-sm text-gray-600 hover:text-gray-800" to="/admin/analytics">Analytics</Link>}
         {user?.role === 'admin' && <Link className="text-sm text-gray-600 hover:text-gray-800" to="/admin/users">Manage Users</Link>}
         {user?.role === 'admin' && <Link className="text-sm text-gray-600 hover:text-gray-800" to="/admin/codes">Manage Codes</Link>}

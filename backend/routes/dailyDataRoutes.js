@@ -4,6 +4,7 @@ const DailyData = require('../models/DailyData');
 const { verifyToken, requireRole } = require('../middleware/authMiddleware');
 
 // Admin: list entries (optional query: year, month, division)
+// Admin: list entries (optional query: year, month, division)
 router.get('/', verifyToken, requireRole('admin'), async (req, res) => {
   try {
     const { year, month, division } = req.query;
@@ -34,14 +35,47 @@ router.get('/', verifyToken, requireRole('admin'), async (req, res) => {
   }
 });
 
-// Admin: create
-router.post('/', verifyToken, requireRole('admin'), async (req, res) => {
+// Users: list their own entries
+router.get('/mine', verifyToken, async (req, res) => {
   try {
-    const { date, liters, dryKilos, metrolac, division } = req.body;
+    const results = await DailyData.find({ createdBy: req.user.id }).sort({ date: -1 }).populate('createdBy', 'name code');
+    res.json(results);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Create: admins and regular users can create entries
+router.post('/', verifyToken, async (req, res) => {
+  try {
+    const { date, liters, dryKilos, metrolac, division, supplierCode, nh3Volume, tmtDVolume } = req.body;
     if (!date) return res.status(400).json({ message: 'Date is required' });
-    const entry = new DailyData({ date: new Date(date), liters: Number(liters || 0), dryKilos: Number(dryKilos || 0), metrolac: Number(metrolac || 0), division: division || '', createdBy: req.user.id });
+    // Determine creator and default division for regular users
+    let entryDivision = '';
+    let createdBy = req.user.id;
+    if (req.user && req.user.role === 'admin') {
+      entryDivision = division || '';
+      // allow admins to set createdBy if provided
+      if (req.body.createdBy) createdBy = req.body.createdBy;
+    } else {
+      // regular users: default division to their user.code if available
+      entryDivision = req.user.code || division || '';
+    }
+
+    const entry = new DailyData({
+      date: new Date(date),
+      liters: Number(liters || 0),
+      dryKilos: Number(dryKilos || 0),
+      metrolac: Number(metrolac || 0),
+      division: entryDivision,
+      supplierCode: supplierCode || '',
+      nh3Volume: Number(nh3Volume || 0),
+      tmtDVolume: Number(tmtDVolume || 0),
+      createdBy
+    });
     await entry.save();
-    res.status(201).json(entry);
+    const saved = await DailyData.findById(entry._id).populate('createdBy', 'name code');
+    res.status(201).json(saved);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
@@ -62,12 +96,15 @@ router.get('/:id', verifyToken, requireRole('admin'), async (req, res) => {
 router.patch('/:id', verifyToken, requireRole('admin'), async (req, res) => {
   try {
     const updates = {};
-    const { date, liters, dryKilos, metrolac, division } = req.body;
+    const { date, liters, dryKilos, metrolac, division, supplierCode, nh3Volume, tmtDVolume } = req.body;
     if (date) updates.date = new Date(date);
     if (liters !== undefined) updates.liters = Number(liters);
     if (dryKilos !== undefined) updates.dryKilos = Number(dryKilos);
     if (metrolac !== undefined) updates.metrolac = Number(metrolac);
     if (division !== undefined) updates.division = division;
+    if (supplierCode !== undefined) updates.supplierCode = supplierCode;
+    if (nh3Volume !== undefined) updates.nh3Volume = Number(nh3Volume);
+    if (tmtDVolume !== undefined) updates.tmtDVolume = Number(tmtDVolume);
     const entry = await DailyData.findByIdAndUpdate(req.params.id, updates, { new: true });
     if (!entry) return res.status(404).json({ message: 'Not found' });
     res.json(entry);

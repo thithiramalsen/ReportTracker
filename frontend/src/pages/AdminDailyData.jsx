@@ -8,6 +8,9 @@ export default function AdminDailyData(){
   const [liters, setLiters] = useState('')
   const [dryKilos, setDryKilos] = useState('')
   const [metrolac, setMetrolac] = useState('')
+  const [supplierCode, setSupplierCode] = useState('')
+  const [nh3Volume, setNh3Volume] = useState('')
+  const [tmtDVolume, setTmtDVolume] = useState('')
   const [division, setDivision] = useState('')
   const [list, setList] = useState([])
   const [codes, setCodes] = useState([])
@@ -32,7 +35,7 @@ export default function AdminDailyData(){
   const submit = async (e) => {
     e && e.preventDefault()
     try {
-      const payload = { date, liters: Number(liters||0), dryKilos: Number(dryKilos||0), metrolac: Number(metrolac||0), division }
+      const payload = { date, liters: Number(liters||0), dryKilos: Number(dryKilos||0), metrolac: Number(metrolac||0), division, supplierCode, nh3Volume: Number(nh3Volume||0), tmtDVolume: Number(tmtDVolume||0) }
       if (editing) {
         await API.patch(`/daily-data/${editing._id}`, payload)
         try { toast.show('Updated', 'success') } catch(e){}
@@ -41,7 +44,7 @@ export default function AdminDailyData(){
         await API.post('/daily-data', payload)
         try { toast.show('Created', 'success') } catch(e){}
       }
-      setDate(''); setLiters(''); setDryKilos(''); setMetrolac(''); setDivision('')
+      setDate(''); setLiters(''); setDryKilos(''); setMetrolac(''); setDivision(''); setSupplierCode(''); setNh3Volume(''); setTmtDVolume('')
       load()
     } catch (err) {
       console.error(err)
@@ -55,6 +58,9 @@ export default function AdminDailyData(){
     setLiters(item.liters||'')
     setDryKilos(item.dryKilos||'')
     setMetrolac(item.metrolac||'')
+    setSupplierCode(item.supplierCode||'')
+    setNh3Volume(item.nh3Volume||'')
+    setTmtDVolume(item.tmtDVolume||'')
     setDivision(item.division||'')
   }
 
@@ -100,6 +106,18 @@ export default function AdminDailyData(){
           <label className="block text-sm">Metrolac</label>
           <input value={metrolac} onChange={e=>setMetrolac(e.target.value)} className="w-full" />
         </div>
+        <div>
+          <label className="block text-sm">Supplier code</label>
+          <input value={supplierCode} onChange={e=>setSupplierCode(e.target.value)} className="w-full" />
+        </div>
+        <div>
+          <label className="block text-sm">NH3 Volume</label>
+          <input value={nh3Volume} onChange={e=>setNh3Volume(e.target.value)} className="w-full" />
+        </div>
+        <div>
+          <label className="block text-sm">TMTD Volume</label>
+          <input value={tmtDVolume} onChange={e=>setTmtDVolume(e.target.value)} className="w-full" />
+        </div>
         <div className="flex items-end">
           <button className="btn" type="submit">{editing ? 'Update' : 'Create'}</button>
         </div>
@@ -114,6 +132,7 @@ export default function AdminDailyData(){
                 <div>
                   <div className="font-medium">{new Date(item.date).toLocaleDateString()} — {item.division}</div>
                   <div className="text-sm text-gray-600">Liters: {item.liters} • Dry Kilos: {item.dryKilos} • Metrolac: {item.metrolac}</div>
+                  <div className="text-sm text-gray-600">Supplier: {item.supplierCode || '—'} • NH3: {item.nh3Volume || 0} • TMTD: {item.tmtDVolume || 0}</div>
                   <div className="text-xs text-gray-500">By: {item.createdBy ? item.createdBy.name : '—'}</div>
                 </div>
                 <div className="flex gap-2">

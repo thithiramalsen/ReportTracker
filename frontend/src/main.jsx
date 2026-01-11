@@ -13,6 +13,8 @@ import AdminNotifyAnalytics from './pages/AdminNotifyAnalytics'
 import AdminFeedback from './pages/AdminFeedback'
 import FeedbackPage from './pages/FeedbackPage'
 import AdminDailyData from './pages/AdminDailyData'
+import DailyDataEntry from './pages/DailyDataEntry'
+import MyDailyData from './pages/MyDailyData'
 import Notifications from './pages/Notifications'
 import OpenNext from './pages/OpenNext'
 import ForgotPassword from './pages/ForgotPassword'
@@ -59,6 +61,8 @@ createRoot(document.getElementById('root')).render(
           <Route path='/settings' element={<ProtectedRoute><UserSettings /></ProtectedRoute>} />
           <Route path='/open' element={<OpenNext />} />
           <Route path='/upload' element={<AdminRoute><UploadPage /></AdminRoute>} />
+          <Route path='/daily-data' element={<ProtectedRoute><DailyDataEntry /></ProtectedRoute>} />
+          <Route path='/my-daily-data' element={<ProtectedRoute><MyDailyData /></ProtectedRoute>} />
           <Route path='/admin/users' element={<AdminRoute><AdminUsers /></AdminRoute>} />
           <Route path='/admin/codes' element={<AdminRoute><AdminCodes /></AdminRoute>} />
           <Route path='/admin/notify-jobs' element={<AdminRoute><AdminNotifyJobs /></AdminRoute>} />

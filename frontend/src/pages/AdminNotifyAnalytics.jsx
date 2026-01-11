@@ -26,36 +26,81 @@ export default function AdminAnalytics(){
   const [breakdown, setBreakdown] = useState(false)
   const [compare, setCompare] = useState(null)
   const [division, setDivision] = useState('')
+  const [userFilter, setUserFilter] = useState('')
   const [codes, setCodes] = useState([])
+  const [users, setUsers] = useState([])
   const [year, setYear] = useState(new Date().getFullYear())
 
   const [tab, setTab] = useState('drc')
 
   const loadSms = async ()=>{
-    try { const res = await API.get('/notify/analytics'); setSmsStats(res.data) } catch(e){ console.error(e) }
+    console.debug('loadSms');
+    try { const res = await API.get('/notify/analytics'); setSmsStats(res.data) } catch(e){ console.error('loadSms error', e) }
   }
-  const loadDrc = async (div, yr) =>{
-    try { const res = await API.get(`/analytics/last12${div?`?division=${encodeURIComponent(div)}`:''}`); setDrcStats(res.data) } catch(e){ console.error(e) }
+  const loadDrc = async (div, yr, user) =>{
+    try {
+      const u = user !== undefined ? user : userFilter
+      console.debug('loadDrc', { division: div, year: yr, user: u })
+      const parts = []
+      if (div) parts.push(`division=${encodeURIComponent(div)}`)
+      if (u) parts.push(`user=${encodeURIComponent(u)}`)
+      parts.push(`_=${Date.now()}`)
+      const qs = parts.join('&')
+      const res = await API.get(`/analytics/last12?${qs}`);
+      console.debug('loadDrc response', res.data)
+      setDrcStats(res.data)
+    } catch(e){ console.error('loadDrc error', e) }
   }
-  const loadCompare = async (yr, m, div) => {
-    try { const res = await API.get(`/analytics/compare?year=${yr}&month=${m}${div?`&division=${encodeURIComponent(div)}`:''}`); setCompare(res.data) } catch(e){ console.error(e) }
+  const loadCompare = async (yr, m, div, user) => {
+    try {
+      const u = user !== undefined ? user : userFilter
+      console.debug('loadCompare', { year: yr, month: m, division: div, user: u })
+      const parts = [`year=${yr}`, `month=${m}`]
+      if (div) parts.push(`division=${encodeURIComponent(div)}`)
+      if (u) parts.push(`user=${encodeURIComponent(u)}`)
+      parts.push(`_=${Date.now()}`)
+      const qs = parts.join('&')
+      const res = await API.get(`/analytics/compare?${qs}`);
+      console.debug('loadCompare response', res.data)
+      setCompare(res.data)
+    } catch(e){ console.error('loadCompare error', e) }
   }
 
-  const loadDaily = async (s = startDate, e = endDate, div = division, br = breakdown) => {
+  const loadDaily = async (s = startDate, e = endDate, div = division, br = breakdown, user) => {
     try {
-      const q = `?start=${encodeURIComponent(s)}&end=${encodeURIComponent(e)}${div?`&division=${encodeURIComponent(div)}`:''}${br?`&breakdown=1`:''}`
+      const u = user !== undefined ? user : userFilter
+      console.debug('loadDaily', { start: s, end: e, division: div, breakdown: br, user: u })
+      const parts = [
+        `start=${encodeURIComponent(s)}`,
+        `end=${encodeURIComponent(e)}`
+      ]
+      if (div) parts.push(`division=${encodeURIComponent(div)}`)
+      if (u) parts.push(`user=${encodeURIComponent(u)}`)
+      if (br) parts.push('breakdown=1')
+      parts.push(`_=${Date.now()}`)
+      const q = `?${parts.join('&')}`
       const res = await API.get(`/analytics/daily${q}`)
+      console.debug('loadDaily response size', { count: (res.data?.data || []).length, breakdown: res.data?.breakdown })
       setDailyStats(res.data)
-    } catch (err) { console.error(err) }
+    } catch (err) { console.error('loadDaily error', err) }
   }
 
   useEffect(()=>{
     loadSms();
     loadDrc('', year);
     loadDaily();
+    API.get('/users').then(r=>setUsers(r.data)).catch(()=>{})
     API.get('/codes').then(r=>setCodes(r.data)).catch(()=>{})
     const cur = new Date(); loadCompare(cur.getFullYear(), cur.getMonth()+1, '')
   }, [])
+
+  useEffect(() => {
+    console.debug('filters changed', { division, userFilter })
+    const now = new Date();
+    loadDrc(division, year, userFilter);
+    loadDaily(startDate, endDate, division, breakdown, userFilter);
+    loadCompare(now.getFullYear(), now.getMonth() + 1, division, userFilter);
+  }, [division, userFilter])
 
   if (!smsStats || !drcStats) return <div className="max-w-3xl mx-auto mt-6">Loading...</div>
 
@@ -64,6 +109,8 @@ export default function AdminAnalytics(){
   const litersData = drcStats.data.map(r => r.liters || 0)
   const dryData = drcStats.data.map(r => r.dryKilos || 0)
   const metrolacData = drcStats.data.map(r => r.metrolacAvg || 0)
+  const nh3Data = drcStats.data.map(r => r.nh3Volume || 0)
+  const tmtDData = drcStats.data.map(r => r.tmtDVolume || 0)
 
   const barOptions = {
     responsive: true,
@@ -78,7 +125,11 @@ export default function AdminAnalytics(){
     ]
   }
 
-  const lineData = { labels, datasets: [{ label: 'Metrolac (avg)', data: metrolacData, borderColor: 'rgba(234,88,12,0.9)', backgroundColor: 'rgba(234,88,12,0.4)', tension: 0.3 }] }
+  const lineData = { labels, datasets: [
+    { label: 'Metrolac (avg)', data: metrolacData, borderColor: 'rgba(234,88,12,0.9)', backgroundColor: 'rgba(234,88,12,0.4)', tension: 0.3 },
+    { label: 'NH3 Volume', data: nh3Data, borderColor: 'rgba(3,105,161,0.9)', backgroundColor: 'rgba(3,105,161,0.2)', tension: 0.3 },
+    { label: 'TMTD Volume', data: tmtDData, borderColor: 'rgba(124,58,237,0.9)', backgroundColor: 'rgba(124,58,237,0.2)', tension: 0.3 }
+  ] }
 
   const curMonthLabel = labels[labels.length-1]
 
@@ -110,9 +161,13 @@ export default function AdminAnalytics(){
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold">Analytics</h2>
         <div className="flex gap-2 items-center">
-          <select value={division} onChange={e=>{ setDivision(e.target.value); loadDrc(e.target.value, year); }} className="border p-1 rounded">
+          <select value={division} onChange={e=>{ const newDiv = e.target.value; setDivision(newDiv); }} className="border p-1 rounded">
             <option value="">All Divisions</option>
             {codes.map(c => <option key={c._id} value={c.code}>{c.code}{c.label?` — ${c.label}`:''}</option>)}
+          </select>
+          <select value={userFilter} onChange={e=>{ const newUser = e.target.value; setUserFilter(newUser); }} className="border p-1 rounded">
+            <option value="">All Users</option>
+            {users.map(u => <option key={u._id} value={u._id}>{u.name} — {u.code}</option>)}
           </select>
         </div>
       </div>
@@ -146,10 +201,12 @@ export default function AdminAnalytics(){
             {dailyStats && !dailyStats.data && <div>Loading daily data...</div>}
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-5 gap-4">
             <SummaryCard title={`SMS sent (last period)`} value={smsStats.sent || 0} delta={smsStats.sent - (smsStats.prevSent||0)} />
             <SummaryCard title={`Liters (${curMonthLabel})`} value={litersData[litersData.length-1] || 0} delta={(litersData[litersData.length-1]||0) - (litersData[litersData.length-2]||0)} />
-            <SummaryCard title={`Metrolac avg (${curMonthLabel})`} value={(metrolacData[metrolacData.length-1]||0).toFixed(2)} delta={compare ? ((compare.current.metrolacAvg||0) - (compare.previous.metrolacAvg||0)).toFixed(2) : undefined} />
+            <SummaryCard title={`Dry Kilos (${curMonthLabel})`} value={dryData[dryData.length-1] || 0} />
+            <SummaryCard title={`NH3 Volume (${curMonthLabel})`} value={nh3Data[nh3Data.length-1] || 0} />
+            <SummaryCard title={`TMTD Volume (${curMonthLabel})`} value={tmtDData[tmtDData.length-1] || 0} />
           </div>
 
           <div className="card p-4">
@@ -172,7 +229,9 @@ export default function AdminAnalytics(){
                   const liters = (dailyStats.data||[]).map(r => r.liters || 0)
                   const dry = (dailyStats.data||[]).map(r => r.dryKilos || 0)
                   const met = (dailyStats.data||[]).map(r => r.metrolacAvg || 0)
-                  const dailyLine = { labels, datasets: [ { label: 'Liters', data: liters, borderColor: 'rgba(59,130,246,0.9)', backgroundColor: 'rgba(59,130,246,0.2)' }, { label: 'Dry Kilos', data: dry, borderColor: 'rgba(34,197,94,0.9)', backgroundColor: 'rgba(34,197,94,0.2)' }, { label: 'Metrolac (avg)', data: met, borderColor: 'rgba(234,88,12,0.9)', backgroundColor: 'rgba(234,88,12,0.2)' } ] }
+                  const nh3 = (dailyStats.data||[]).map(r => r.nh3Volume || 0)
+                  const tmt = (dailyStats.data||[]).map(r => r.tmtDVolume || 0)
+                  const dailyLine = { labels, datasets: [ { label: 'Liters', data: liters, borderColor: 'rgba(59,130,246,0.9)', backgroundColor: 'rgba(59,130,246,0.2)' }, { label: 'Dry Kilos', data: dry, borderColor: 'rgba(34,197,94,0.9)', backgroundColor: 'rgba(34,197,94,0.2)' }, { label: 'Metrolac (avg)', data: met, borderColor: 'rgba(234,88,12,0.9)', backgroundColor: 'rgba(234,88,12,0.2)' }, { label: 'NH3 Volume', data: nh3, borderColor: 'rgba(3,105,161,0.9)', backgroundColor: 'rgba(3,105,161,0.2)' }, { label: 'TMTD Volume', data: tmt, borderColor: 'rgba(124,58,237,0.9)', backgroundColor: 'rgba(124,58,237,0.2)' } ] }
                   return <Line options={{ responsive:true }} data={dailyLine} />
                 })()
               )}
