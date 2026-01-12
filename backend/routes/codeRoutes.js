@@ -14,6 +14,16 @@ router.get('/', verifyToken, requireRole('admin'), async (req, res) => {
   }
 });
 
+// Public: list supplier codes (active)
+router.get('/suppliers', async (req, res) => {
+  try {
+    const suppliers = await CodeSlot.find({ role: 'supplier', isActive: true }).sort({ code: 1 }).select('code label');
+    res.json(suppliers);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 // Public: list available codes (not used, active)
 router.get('/available', async (req, res) => {
   try {
@@ -35,6 +45,22 @@ router.post('/', verifyToken, requireRole('admin'), async (req, res) => {
     const slot = new CodeSlot({ code, label, role: role || 'user' });
     await slot.save();
     res.status(201).json(slot);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Admin: update code slot (label, role, isActive)
+router.patch('/:id', verifyToken, requireRole('admin'), async (req, res) => {
+  try {
+    const { label, role, isActive } = req.body;
+    const slot = await CodeSlot.findById(req.params.id);
+    if (!slot) return res.status(404).json({ message: 'Not found' });
+    if (typeof label !== 'undefined') slot.label = label;
+    if (typeof role !== 'undefined') slot.role = role;
+    if (typeof isActive !== 'undefined') slot.isActive = isActive;
+    await slot.save();
+    res.json(slot);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }

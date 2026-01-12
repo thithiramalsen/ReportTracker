@@ -14,6 +14,7 @@ export default function AdminDailyData(){
   const [division, setDivision] = useState('')
   const [list, setList] = useState([])
   const [codes, setCodes] = useState([])
+  const [suppliers, setSuppliers] = useState([])
   const [editing, setEditing] = useState(null)
   const toast = useToast()
   const [pendingDelete, setPendingDelete] = useState(null)
@@ -27,8 +28,12 @@ export default function AdminDailyData(){
 
   useEffect(()=>{ load() }, [])
   useEffect(()=>{
+    if (!date) setDate(new Date().toISOString().slice(0,10))
+  }, [])
+  useEffect(()=>{
     let mounted = true
     API.get('/codes').then(res => { if (mounted) setCodes(res.data) }).catch(()=>{})
+    API.get('/codes/suppliers').then(res => { if (mounted) setSuppliers(res.data) }).catch(()=>{})
     return ()=>{ mounted = false }
   }, [])
 
@@ -44,7 +49,7 @@ export default function AdminDailyData(){
         await API.post('/daily-data', payload)
         try { toast.show('Created', 'success') } catch(e){}
       }
-      setDate(''); setLiters(''); setDryKilos(''); setMetrolac(''); setDivision(''); setSupplierCode(''); setNh3Volume(''); setTmtDVolume('')
+      setDate(new Date().toISOString().slice(0,10)); setLiters(''); setDryKilos(''); setMetrolac(''); setDivision(''); setSupplierCode(''); setNh3Volume(''); setTmtDVolume('')
       load()
     } catch (err) {
       console.error(err)
@@ -107,8 +112,13 @@ export default function AdminDailyData(){
           <input value={metrolac} onChange={e=>setMetrolac(e.target.value)} className="w-full" />
         </div>
         <div>
-          <label className="block text-sm">Supplier code</label>
-          <input value={supplierCode} onChange={e=>setSupplierCode(e.target.value)} className="w-full" />
+          <label className="block text-sm">Supplier</label>
+          <select value={supplierCode} onChange={e=>setSupplierCode(e.target.value)} className="w-full border p-2 rounded">
+            <option value="">— Select supplier —</option>
+            {suppliers.map(s => (
+              <option key={s._id} value={s.code}>{s.code}{s.label ? ` — ${s.label}` : ''}</option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="block text-sm">NH3 Volume</label>

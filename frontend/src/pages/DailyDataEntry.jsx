@@ -11,9 +11,13 @@ export default function DailyDataEntry(){
   const [nh3Volume, setNh3Volume] = useState('')
   const [tmtDVolume, setTmtDVolume] = useState('')
   const toast = useToast()
+  const [suppliers, setSuppliers] = useState([])
 
   useEffect(()=>{
     if (!date) setDate(new Date().toISOString().slice(0,10))
+    let mounted = true
+    API.get('/codes/suppliers').then(r => { if (mounted) setSuppliers(r.data) }).catch(()=>{})
+    return () => { mounted = false }
   }, [])
 
   const submit = async (e) => {
@@ -47,8 +51,13 @@ export default function DailyDataEntry(){
           <input type="date" value={date} onChange={e=>setDate(e.target.value)} className="w-full" />
         </div>
         <div>
-          <label className="block text-sm">Supplier code</label>
-          <input value={supplierCode} onChange={e=>setSupplierCode(e.target.value)} className="w-full" />
+          <label className="block text-sm">Supplier</label>
+          <select value={supplierCode} onChange={e=>setSupplierCode(e.target.value)} className="w-full border p-2 rounded">
+            <option value="">— Select supplier —</option>
+            {suppliers.map(s => (
+              <option key={s._id} value={s.code}>{s.code}{s.label ? ` — ${s.label}` : ''}</option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="block text-sm">Liters</label>
