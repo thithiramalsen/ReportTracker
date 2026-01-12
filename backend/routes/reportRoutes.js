@@ -151,6 +151,12 @@ router.post('/', verifyToken, requireRole('admin'), upload.single('file'), async
       }
     }
 
+    // persist codes on report for display
+    if (parsedCodes && parsedCodes.length) {
+      report.codes = parsedCodes.map(c => String(c).trim())
+      await report.save()
+    }
+
     const accessRecords = parsedUserIds.map((uid) => ({ reportId: report._id, userId: uid }));
     if (accessRecords.length) await ReportAccess.insertMany(accessRecords);
 

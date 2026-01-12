@@ -14,6 +14,7 @@ export default function UploadPage() {
   const [codes, setCodes] = useState([])
   const [selected, setSelected] = useState([])
   const [selectedCodes, setSelectedCodes] = useState([])
+  const [userSearch, setUserSearch] = useState('')
   const [reports, setReports] = useState([])
   const [editingReport, setEditingReport] = useState(null)
   const [pendingDelete, setPendingDelete] = useState(null)
@@ -89,6 +90,7 @@ export default function UploadPage() {
       setFile(null)
       setSelected([])
       setSelectedCodes([])
+      setUserSearch('')
     } catch (err) {
       const em = err?.response?.data?.message || 'Upload failed'
       try { toast.show(em, 'error') } catch(e){}
@@ -191,6 +193,7 @@ export default function UploadPage() {
           )}
           {errors.file && <div className="text-xs text-red-600 mt-1">{errors.file}</div>}
         </div>
+        {/* Assigned users removed — assignment is handled by selected division codes */}
 
         <div className="mt-3 flex items-center gap-3">
           <label htmlFor="sendSms" className="flex items-center cursor-pointer select-none">
@@ -205,8 +208,8 @@ export default function UploadPage() {
         <div className="mt-3">
           <label className="block text-sm">Assign by Division Codes</label>
           <select multiple value={selectedCodes} onChange={e => setSelectedCodes(Array.from(e.target.selectedOptions, o=>o.value))} className="w-full border p-2 mt-1 rounded h-40">
-            {codes.map(c => (
-              <option key={c._id} value={c.code}>{c.code}{c.label ? ` — ${c.label}` : ''} {c.usedBy ? ` — ${c.usedBy.name}` : ' — (unassigned)'} ({c.role || 'user'})</option>
+            {codes.filter(c => c.role !== 'supplier').map(c => (
+              <option key={c._id} value={c.code}>{c.code}{c.label ? ` — ${c.label}` : ''} {c.usedBy ? ` — ${c.usedBy.name}` : ' — (unassigned)'}</option>
             ))}
           </select>
           <div className="text-xs text-gray-500 mt-1">Select division codes to assign everyone in those divisions.</div>
@@ -240,7 +243,8 @@ export default function UploadPage() {
                   <div className="font-medium">{r.title}</div>
                   <div className="text-sm text-gray-600">Report date: {new Date(r.reportDate).toLocaleDateString()}</div>
                   <div className="text-sm text-gray-500">Uploaded: {r.createdAt ? new Date(r.createdAt).toLocaleString() : '—'}</div>
-                  <div className="text-sm text-gray-700 mt-2">Assigned: {r.assignedUsers && r.assignedUsers.length ? r.assignedUsers.map(u=>u.name || u.code).join(', ') : '—'}</div>
+                    <div className="text-sm text-gray-700 mt-2">Assigned: {r.assignedUsers && r.assignedUsers.length ? r.assignedUsers.map(u=>u.name || u.code).join(', ') : '—'}</div>
+                    <div className="text-sm text-gray-600 mt-1">Divisions: {r.codes && r.codes.length ? r.codes.join(', ') : '—'}</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button title="View" onClick={()=>openBlob(r._id)} className="px-2 py-1 border rounded" aria-label="view"><Eye className="w-4 h-4"/></button>

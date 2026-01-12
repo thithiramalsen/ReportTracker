@@ -10,6 +10,8 @@ export default function DailyDataEntry(){
   const [supplierCode, setSupplierCode] = useState('')
   const [nh3Volume, setNh3Volume] = useState('')
   const [tmtDVolume, setTmtDVolume] = useState('')
+  const [errors, setErrors] = useState({})
+  const [submitting, setSubmitting] = useState(false)
   const toast = useToast()
   const [suppliers, setSuppliers] = useState([])
 
@@ -22,6 +24,16 @@ export default function DailyDataEntry(){
 
   const submit = async (e) => {
     e && e.preventDefault()
+    const errs = {}
+    if (!date) errs.date = 'Date is required'
+    if (!supplierCode) errs.supplierCode = 'Supplier is required'
+    const numFields = { liters, dryKilos, metrolac, nh3Volume, tmtDVolume }
+    Object.entries(numFields).forEach(([k,v])=>{
+      if (v!=='' && isNaN(Number(v))) errs[k] = 'Must be a number'
+      if (v!=='' && Number(v) < 0) errs[k] = 'Must be >= 0'
+    })
+    if (Object.keys(errs).length) { setErrors(errs); return }
+    setSubmitting(true)
     try {
       const payload = {
         date,
@@ -39,7 +51,7 @@ export default function DailyDataEntry(){
     } catch (err) {
       console.error(err)
       try { toast.show(err?.response?.data?.message || 'Save failed', 'error') } catch(e){}
-    }
+    } finally { setSubmitting(false) }
   }
 
   return (
@@ -48,39 +60,46 @@ export default function DailyDataEntry(){
       <form onSubmit={submit} className="grid grid-cols-2 gap-3 mb-4">
         <div>
           <label className="block text-sm">Date</label>
-          <input type="date" value={date} onChange={e=>setDate(e.target.value)} className="w-full" />
+          <input type="date" value={date} onChange={e=>{ setDate(e.target.value); setErrors(prev=>({ ...prev, date: undefined })) }} className="w-full" />
+          {errors.date && <div className="text-xs text-red-600 mt-1">{errors.date}</div>}
         </div>
         <div>
           <label className="block text-sm">Supplier</label>
-          <select value={supplierCode} onChange={e=>setSupplierCode(e.target.value)} className="w-full border p-2 rounded">
+          <select value={supplierCode} onChange={e=>{ setSupplierCode(e.target.value); setErrors(prev=>({ ...prev, supplierCode: undefined })) }} className="w-full border p-2 rounded">
             <option value="">— Select supplier —</option>
             {suppliers.map(s => (
               <option key={s._id} value={s.code}>{s.code}{s.label ? ` — ${s.label}` : ''}</option>
             ))}
           </select>
+          {errors.supplierCode && <div className="text-xs text-red-600 mt-1">{errors.supplierCode}</div>}
         </div>
         <div>
           <label className="block text-sm">Liters</label>
-          <input value={liters} onChange={e=>setLiters(e.target.value)} className="w-full" />
+          <input type="number" min="0" step="any" value={liters} onChange={e=>{ setLiters(e.target.value); setErrors(prev=>({ ...prev, liters: undefined })) }} className="w-full" />
+          {errors.liters && <div className="text-xs text-red-600 mt-1">{errors.liters}</div>}
         </div>
         <div>
           <label className="block text-sm">Dry kilos</label>
-          <input value={dryKilos} onChange={e=>setDryKilos(e.target.value)} className="w-full" />
+          <input type="number" min="0" step="any" value={dryKilos} onChange={e=>{ setDryKilos(e.target.value); setErrors(prev=>({ ...prev, dryKilos: undefined })) }} className="w-full" />
+          {errors.dryKilos && <div className="text-xs text-red-600 mt-1">{errors.dryKilos}</div>}
         </div>
         <div>
           <label className="block text-sm">Metrolac</label>
-          <input value={metrolac} onChange={e=>setMetrolac(e.target.value)} className="w-full" />
+          <input type="number" min="0" step="any" value={metrolac} onChange={e=>{ setMetrolac(e.target.value); setErrors(prev=>({ ...prev, metrolac: undefined })) }} className="w-full" />
+          {errors.metrolac && <div className="text-xs text-red-600 mt-1">{errors.metrolac}</div>}
         </div>
         <div>
           <label className="block text-sm">NH3 Volume</label>
-          <input value={nh3Volume} onChange={e=>setNh3Volume(e.target.value)} className="w-full" />
+          <input type="number" min="0" step="any" value={nh3Volume} onChange={e=>{ setNh3Volume(e.target.value); setErrors(prev=>({ ...prev, nh3Volume: undefined })) }} className="w-full" />
+          {errors.nh3Volume && <div className="text-xs text-red-600 mt-1">{errors.nh3Volume}</div>}
         </div>
         <div>
           <label className="block text-sm">TMTD Volume</label>
-          <input value={tmtDVolume} onChange={e=>setTmtDVolume(e.target.value)} className="w-full" />
+          <input type="number" min="0" step="any" value={tmtDVolume} onChange={e=>{ setTmtDVolume(e.target.value); setErrors(prev=>({ ...prev, tmtDVolume: undefined })) }} className="w-full" />
+          {errors.tmtDVolume && <div className="text-xs text-red-600 mt-1">{errors.tmtDVolume}</div>}
         </div>
         <div className="flex items-end">
-          <button className="btn" type="submit">Save</button>
+          <button className="btn" type="submit" disabled={submitting}>Save</button>
         </div>
       </form>
     </div>
