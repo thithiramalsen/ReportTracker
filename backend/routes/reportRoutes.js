@@ -93,7 +93,46 @@ router.post('/', verifyToken, requireRole('admin'), upload.single('file'), async
     const { title, description, reportDate, userIds } = req.body;
     // allow optional flag to control SMS notifications for this upload
     const sendSmsFlag = (req.body.sendSms === 'true' || req.body.sendSms === true || req.body.sendSms === '1');
-    if (!title || !reportDate || !req.file) return res.status(400).json({ message: 'Missing fields' });
+
+    // basic required checks
+    if (!title || !String(title).trim()) return res.status(400).json({ message: 'Title is required' });
+    if (!reportDate) return res.status(400).json({ message: 'Report date is required' });
+    if (!req.file) return res.status(400).json({ message: 'File is required' });
+    // validate date
+    const parsedDate = new Date(reportDate);
+    if (Number.isNaN(parsedDate.getTime())) return res.status(400).json({ message: 'Invalid report date' });
+    // enforce file size limit (25MB)
+    try { if (req.file.size && req.file.size > 25 * 1024 * 1024) return res.status(400).json({ message: 'File must be under 25MB' }) } catch (e) {}
+
+    // Parse provided userIds and division codes and resolve to user ids BEFORE saving file
+    let parsedUserIds = [];
+    if (userIds) {
+      try {
+        parsedUserIds = typeof userIds === 'string' ? JSON.parse(userIds) : userIds;
+      } catch (e) {
+        parsedUserIds = typeof userIds === 'string' ? userIds.split(',').map(s => s.trim()) : [];
+      }
+    }
+
+    // If codes provided, resolve users with those division codes
+    let parsedCodes = [];
+    if (req.body.codes) {
+      try {
+        parsedCodes = typeof req.body.codes === 'string' ? JSON.parse(req.body.codes) : req.body.codes;
+      } catch (e) {
+        parsedCodes = typeof req.body.codes === 'string' ? req.body.codes.split(',').map(s => s.trim().toLowerCase()) : [];
+      }
+      if (parsedCodes && parsedCodes.length) {
+        const usersFromCodes = await User.find({ code: { $in: parsedCodes.map(c => String(c).trim().toLowerCase()) } }).select('_id');
+        const idsFromCodes = usersFromCodes.map(u => String(u._id));
+        parsedUserIds = Array.from(new Set([...(parsedUserIds || []), ...idsFromCodes]));
+      }
+    }
+
+    // Require at least one assigned user (via userIds or via resolved division codes)
+    if (!parsedUserIds || parsedUserIds.length === 0) {
+      return res.status(400).json({ message: 'Upload must assign to at least one user via selected division codes' });
+    }
 
     let fileUrl = '';
     if (useS3 && req.file && req.file.buffer) {
@@ -125,30 +164,10 @@ router.post('/', verifyToken, requireRole('admin'), upload.single('file'), async
     });
     await report.save();
 
-    // Assign to users (accepts userIds and/or codes)
-    let parsedUserIds = [];
-    if (userIds) {
-      try {
-        parsedUserIds = typeof userIds === 'string' ? JSON.parse(userIds) : userIds;
-      } catch (e) {
-        // If not JSON, assume comma separated
-        parsedUserIds = typeof userIds === 'string' ? userIds.split(',').map(s => s.trim()) : [];
-      }
-    }
-
-    // If codes provided, resolve users with those division codes
-    let parsedCodes = [];
-    if (req.body.codes) {
-      try {
-        parsedCodes = typeof req.body.codes === 'string' ? JSON.parse(req.body.codes) : req.body.codes;
-      } catch (e) {
-        parsedCodes = typeof req.body.codes === 'string' ? req.body.codes.split(',').map(s => s.trim().toLowerCase()) : [];
-      }
-      if (parsedCodes && parsedCodes.length) {
-        const usersFromCodes = await User.find({ code: { $in: parsedCodes.map(c => String(c).trim().toLowerCase()) } }).select('_id');
-        const idsFromCodes = usersFromCodes.map(u => String(u._id));
-        parsedUserIds = Array.from(new Set([...parsedUserIds, ...idsFromCodes]));
-      }
+    // persist codes on report for display (parsedCodes parsed earlier)
+    if (parsedCodes && parsedCodes.length) {
+      report.codes = parsedCodes.map(c => String(c).trim())
+      await report.save()
     }
 
     const accessRecords = parsedUserIds.map((uid) => ({ reportId: report._id, userId: uid }));

@@ -35,18 +35,23 @@ router.get('/', verifyToken, requireRole('admin'), async (req, res) => {
   }
 });
 
-// Users: list their own entries
+// Users: list entries for their division (admins use GET / to list everything)
 router.get('/mine', verifyToken, async (req, res) => {
   try {
-    const results = await DailyData.find({ createdBy: req.user.id }).sort({ date: -1 }).populate('createdBy', 'name code');
+    if (req.user && req.user.role === 'admin') {
+      const results = await DailyData.find({ createdBy: req.user.id }).sort({ date: -1 }).populate('createdBy', 'name code');
+      return res.json(results);
+    }
+    const userCode = req.user.code || '';
+    const results = await DailyData.find({ division: userCode }).sort({ date: -1 }).populate('createdBy', 'name code');
     res.json(results);
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
-// Create: admins and regular users can create entries
-router.post('/', verifyToken, async (req, res) => {
+// Create: only admins may create entries now. Regular users should flag discrepancies instead.
+router.post('/', verifyToken, requireRole('admin'), async (req, res) => {
   try {
     const { date, liters, dryKilos, metrolac, division, supplierCode, nh3Volume, tmtDVolume } = req.body;
     if (!date) return res.status(400).json({ message: 'Date is required' });
