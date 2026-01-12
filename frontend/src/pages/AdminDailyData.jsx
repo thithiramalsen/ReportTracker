@@ -94,7 +94,7 @@ export default function AdminDailyData(){
           <label className="block text-sm">Division</label>
           <select value={division} onChange={e=>setDivision(e.target.value)} className="w-full border p-2 rounded">
             <option value="">— Select division —</option>
-            {codes.map(c => (
+            {codes.filter(c => c.role !== 'supplier').map(c => (
               <option key={c._id} value={c.code}>{c.code}{c.label ? ` — ${c.label}` : ''}</option>
             ))}
           </select>
