@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import API from '../api'
 import { Bar, Line } from 'react-chartjs-2'
 import html2canvas from 'html2canvas'
@@ -7,12 +7,22 @@ import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement,
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend)
 
-function SummaryCard({ title, value, delta }){
+function SummaryCard({ title, subtitle, value, delta, accent='blue' }){
+  const accentBorder = {
+    blue: 'border-blue-600',
+    green: 'border-green-600',
+    amber: 'border-amber-500',
+    purple: 'border-purple-600'
+  }[accent] || 'border-gray-200'
+
   return (
-    <div className="p-4 bg-white rounded shadow-sm">
-      <div className="text-sm text-gray-500">{title}</div>
-      <div className="text-2xl font-semibold">{value}</div>
-      {delta !== undefined && <div className="text-sm text-gray-600">{delta>=0 ? '+' : ''}{delta}</div>}
+    <div className={`bg-white rounded-lg shadow-sm border-l-4 ${accentBorder}`}>
+      <div className="p-4">
+        <div className="text-sm text-gray-700 font-medium">{title}</div>
+        {subtitle && <div className="text-xs text-gray-400 mt-0.5">{subtitle}</div>}
+        <div className="text-2xl font-semibold mt-3">{value}</div>
+        {delta !== undefined && <div className="text-sm text-gray-600 mt-1">{delta>=0 ? '+' : ''}{delta}</div>}
+      </div>
     </div>
   )
 }
@@ -36,6 +46,7 @@ export default function AdminAnalytics(){
   const [year, setYear] = useState(new Date().getFullYear())
 
   const [tab, setTab] = useState('overview')
+  const dateDebounce = useRef(null)
 
   const loadSms = async ()=>{
     console.debug('loadSms');
@@ -106,6 +117,31 @@ export default function AdminAnalytics(){
     loadCompare(now.getFullYear(), now.getMonth() + 1, division, userFilter || supplierFilter);
   }, [division, userFilter, supplierFilter])
 
+  // responsive date selection: call loadDaily when start/end change (debounced)
+  useEffect(() => {
+    if (dateDebounce.current) clearTimeout(dateDebounce.current)
+    dateDebounce.current = setTimeout(() => {
+      loadDaily(startDate, endDate, division, breakdown, userFilter || supplierFilter)
+    }, 450)
+    return () => { if (dateDebounce.current) clearTimeout(dateDebounce.current) }
+  }, [startDate, endDate, division, breakdown, userFilter, supplierFilter])
+
+  // real-time polling: refresh analytics periodically while user is viewing analytics
+  useEffect(() => {
+    // only poll when on an analytics tab
+    if (!['overview','accuracy','chemicals'].includes(tab)) return
+    const pollInterval = 15000 // 15s
+    const id = setInterval(() => {
+      try {
+        loadDaily(startDate, endDate, division, breakdown, userFilter || supplierFilter)
+        loadDrc(division, year, userFilter)
+        loadSms()
+        const cur = new Date(); loadCompare(cur.getFullYear(), cur.getMonth() + 1, division, userFilter || supplierFilter)
+      } catch (e) { console.error('poll error', e) }
+    }, pollInterval)
+    return () => clearInterval(id)
+  }, [tab, startDate, endDate, division, breakdown, userFilter, supplierFilter, year])
+
   // derive suppliers from codes (role === 'supplier') and apply division heuristic
   const suppliers = codes.filter(c => c.role === 'supplier')
   const filteredSuppliers = suppliers.filter(s => {
@@ -172,9 +208,9 @@ export default function AdminAnalytics(){
 
   return (
     <div className="max-w-6xl mx-auto mt-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
         <h2 className="text-2xl font-semibold">Analytics</h2>
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-2 items-center w-full md:w-auto">
           <select value={division} onChange={e=>{ const newDiv = e.target.value; setDivision(newDiv); setSupplierFilter(''); }} className="border p-1 rounded">
             <option value="">All Divisions</option>
             {codes.filter(c=>c.role!=='supplier').map(c => <option key={c._id} value={c.code}>{c.code}{c.label?` — ${c.label}`:''}</option>)}
@@ -198,19 +234,19 @@ export default function AdminAnalytics(){
       {tab === 'overview' && (
         <div>
           <div className="flex items-center justify-between">
-            <div className="card p-4 flex items-end gap-3">
-              <div>
-                <label className="text-xs text-gray-500">Start</label>
-                <input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} className="border p-1 rounded" />
+            <div className="card p-4 flex flex-col sm:flex-row items-start sm:items-end gap-3 w-full mb-6">
+                <div className="w-full sm:w-auto">
+                  <label className="text-xs text-gray-500 block">Start</label>
+                  <input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} className="border p-2 rounded w-full sm:w-auto" />
+                </div>
+                <div className="w-full sm:w-auto">
+                  <label className="text-xs text-gray-500 block">End</label>
+                  <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} className="border p-2 rounded w-full sm:w-auto" />
+                </div>
+                <div className="ml-auto">
+                  <button onClick={()=>loadDaily(startDate,endDate,division,breakdown)} className="px-4 py-2 bg-blue-600 text-white rounded shadow">Refresh</button>
+                </div>
               </div>
-              <div>
-                <label className="text-xs text-gray-500">End</label>
-                <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} className="border p-1 rounded" />
-              </div>
-              <div>
-                <button onClick={()=>loadDaily(startDate,endDate,division,breakdown)} className="px-3 py-1 bg-blue-600 text-white rounded">Refresh</button>
-              </div>
-            </div>
             <div className="flex gap-2">
               <button className="px-3 py-1 bg-gray-100 rounded" onClick={async ()=>{
                 const el = document.getElementById('analytics-report'); if (!el) return
@@ -219,7 +255,7 @@ export default function AdminAnalytics(){
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-4" id="analytics-report">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mt-6" id="analytics-report">
             {dailyStats && (
               (() => {
                 const rows = dailyStats.data || []
@@ -229,17 +265,17 @@ export default function AdminAnalytics(){
                 const totalTMT = rows.reduce((s,r)=>s+(r.tmtDVolume||0),0)
                 return (
                   <>
-                    <SummaryCard title={`Total Dry Kilos (${startDate}→${endDate})`} value={totalDry} />
-                    <SummaryCard title={`Avg Metrolac`} value={avgMet} />
-                    <SummaryCard title={`NH3 Vol`} value={totalNH3} />
-                    <SummaryCard title={`TMTD Vol`} value={totalTMT} />
+                    <SummaryCard accent="blue" title={`Total Dry Kilos`} subtitle={`${startDate} → ${endDate}`} value={totalDry} />
+                    <SummaryCard accent="amber" title={`Avg Metrolac`} value={avgMet} />
+                    <SummaryCard accent="green" title={`NH3 Vol`} value={totalNH3} />
+                    <SummaryCard accent="purple" title={`TMTD Vol`} value={totalTMT} />
                   </>
                 )
               })()
             )}
           </div>
 
-          <div className="card p-4 mt-4">
+          <div className="card p-4 mt-4 rounded-lg shadow-md border">
             <h3 className="text-lg mb-2">Daily Dry Kilo Yield</h3>
             {dailyStats && (()=>{
               const labels = (dailyStats.data||[]).map(r => new Date(r.date).toLocaleDateString())
