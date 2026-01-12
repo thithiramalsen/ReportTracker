@@ -55,10 +55,12 @@ export default function AdminAnalytics(){
   const loadDrc = async (div, yr, user) =>{
     try {
       const u = user !== undefined ? user : userFilter
-      console.debug('loadDrc', { division: div, year: yr, user: u })
+      const s = supplierFilter
+      console.debug('loadDrc', { division: div, year: yr, user: u, supplier: s })
       const parts = []
       if (div) parts.push(`division=${encodeURIComponent(div)}`)
       if (u) parts.push(`user=${encodeURIComponent(u)}`)
+      if (s) parts.push(`supplier=${encodeURIComponent(s)}`)
       parts.push(`_=${Date.now()}`)
       const qs = parts.join('&')
       const res = await API.get(`/analytics/last12?${qs}`);
@@ -69,10 +71,12 @@ export default function AdminAnalytics(){
   const loadCompare = async (yr, m, div, user) => {
     try {
       const u = user !== undefined ? user : userFilter
-      console.debug('loadCompare', { year: yr, month: m, division: div, user: u })
+      const s = supplierFilter
+      console.debug('loadCompare', { year: yr, month: m, division: div, user: u, supplier: s })
       const parts = [`year=${yr}`, `month=${m}`]
       if (div) parts.push(`division=${encodeURIComponent(div)}`)
       if (u) parts.push(`user=${encodeURIComponent(u)}`)
+      if (s) parts.push(`supplier=${encodeURIComponent(s)}`)
       parts.push(`_=${Date.now()}`)
       const qs = parts.join('&')
       const res = await API.get(`/analytics/compare?${qs}`);
@@ -84,13 +88,15 @@ export default function AdminAnalytics(){
   const loadDaily = async (s = startDate, e = endDate, div = division, br = breakdown, user) => {
     try {
       const u = user !== undefined ? user : userFilter
-      console.debug('loadDaily', { start: s, end: e, division: div, breakdown: br, user: u })
+      const sup = supplierFilter
+      console.debug('loadDaily', { start: s, end: e, division: div, breakdown: br, user: u, supplier: sup })
       const parts = [
         `start=${encodeURIComponent(s)}`,
         `end=${encodeURIComponent(e)}`
       ]
       if (div) parts.push(`division=${encodeURIComponent(div)}`)
       if (u) parts.push(`user=${encodeURIComponent(u)}`)
+      if (sup) parts.push(`supplier=${encodeURIComponent(sup)}`)
       if (br) parts.push('breakdown=1')
       parts.push(`_=${Date.now()}`)
       const q = `?${parts.join('&')}`
@@ -144,13 +150,18 @@ export default function AdminAnalytics(){
 
   // derive suppliers from codes (role === 'supplier') and apply division heuristic
   const suppliers = codes.filter(c => c.role === 'supplier')
-  const filteredSuppliers = suppliers.filter(s => {
-    if (!division) return true
-    try {
-      // Heuristic: supplier code starts with division or contains division
-      return s.code && s.code.toLowerCase().startsWith(division.toLowerCase()) || (s.code && s.code.toLowerCase().includes(division.toLowerCase()))
-    } catch (e) { return true }
-  }).filter(s => s.code && s.code.toLowerCase().includes(supplierSearch.toLowerCase()))
+  // Always show supplier options; when a division is selected, prioritize
+  // suppliers whose code contains the division string so options don't disappear.
+  const filteredSuppliers = suppliers
+    .filter(s => s.code && s.code.toLowerCase().includes(supplierSearch.toLowerCase()))
+    .sort((a,b) => {
+      if (!division) return 0
+      const da = (a.code||'').toLowerCase().includes(division.toLowerCase())
+      const db = (b.code||'').toLowerCase().includes(division.toLowerCase())
+      if (da && !db) return -1
+      if (!da && db) return 1
+      return 0
+    })
 
   if (!smsStats || !drcStats) return <div className="max-w-3xl mx-auto mt-6">Loading...</div>
 
