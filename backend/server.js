@@ -17,6 +17,7 @@ const notifylk = require('./utils/notifylk');
 const dailyDataRoutes = require('./routes/dailyDataRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const feedbackRoutes = require('./routes/feedbackRoutes');
+const flagRoutes = require('./routes/flagRoutes');
 
 // logging middleware
 const logger = require('./middleware/logger');
@@ -43,6 +44,7 @@ app.use('/api/codes', codeRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/notify', notifyJobsRoutes);
 app.use('/api/daily-data', dailyDataRoutes);
+app.use('/api/flags', flagRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/feedback', feedbackRoutes);
 
