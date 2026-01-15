@@ -24,6 +24,7 @@ export default function AdminCodes(){
   const create = async (e) => {
     e.preventDefault()
     if (!code) return toast.show('Code required', 'error')
+    if (!label) return toast.show('Label required', 'error')
     try {
       await API.post('/codes', { code, label, role })
       setCode(''); setLabel(''); setRole('user')
@@ -38,6 +39,7 @@ export default function AdminCodes(){
   const createSupplier = async (e) => {
     e.preventDefault()
     if (!supplierCode) return toast.show('Code required', 'error')
+    if (!supplierLabel) return toast.show('Label required', 'error')
     try {
       await API.post('/codes', { code: supplierCode, label: supplierLabel, role: 'supplier' })
       setSupplierCode(''); setSupplierLabel('')
@@ -100,17 +102,17 @@ export default function AdminCodes(){
 
       {tab === 'user' && (
         <>
-          <div className="card mb-4">
-            <form onSubmit={create} className="grid grid-cols-3 gap-3 items-end">
-              <div>
+          <div className="card mb-4 p-4">
+            <form onSubmit={create} className="grid grid-cols-12 gap-3 items-end">
+              <div className="col-span-3">
                 <label className="block text-sm">Code</label>
-                <input value={code} onChange={e=>setCode(e.target.value)} />
+                <input className="w-full border p-2 rounded" value={code} onChange={e=>setCode(e.target.value)} placeholder="e.g. ABC123" />
               </div>
-              <div>
+              <div className="col-span-6">
                 <label className="block text-sm">Label</label>
-                <input value={label} onChange={e=>setLabel(e.target.value)} />
+                <input className="w-full border p-2 rounded" value={label} onChange={e=>setLabel(e.target.value)} placeholder="Descriptive label" />
               </div>
-              <div>
+              <div className="col-span-3">
                 <label className="block text-sm">Role</label>
                 <select value={role} onChange={e=>setRole(e.target.value)} className="w-full border p-2 rounded">
                   <option value="user">user</option>
@@ -118,25 +120,28 @@ export default function AdminCodes(){
                   <option value="admin">admin</option>
                 </select>
               </div>
-              <div className="col-span-3 mt-2">
+              <div className="col-span-12 mt-2">
                 <button className="btn" type="submit">Create Code</button>
               </div>
             </form>
           </div>
 
-          <div className="card">
+          <div className="card p-4">
             <h3 className="font-semibold mb-2">User / Admin Codes</h3>
-            {codes.filter(c=>c.role!=='supplier').map(c=> (
-              <div key={c._id} className="flex justify-between items-center py-2">
-                <div>
-                  <div className="font-medium">{c.code} {c.label ? `— ${c.label}` : ''}</div>
-                  <div className="text-sm text-gray-600">Role: {c.role} • Active: {c.isActive ? 'yes' : 'no'} • UsedBy: {c.usedBy ? 'assigned' : 'free'}</div>
+            <div className="space-y-2">
+              {codes.filter(c=>c.role!=='supplier').map(c=> (
+                <div key={c._id} className="flex justify-between items-center py-2 border-b last:border-b-0">
+                  <div>
+                    <div className="font-medium">{c.code} {c.label ? `— ${c.label}` : ''}</div>
+                    <div className="text-sm text-gray-600">Role: {c.role} • Active: {c.isActive ? 'yes' : 'no'}</div>
+                    <div className="text-sm text-gray-600">Assigned: {c.usedBy ? (typeof c.usedBy === 'string' ? c.usedBy : (c.usedBy.name || c.usedBy.email || c.usedBy.username || 'assigned')) : 'free'}</div>
+                  </div>
+                  <div>
+                    <button className="px-3 py-1 bg-red-600 text-white rounded" onClick={()=>remove(c._id)}>Delete</button>
+                  </div>
                 </div>
-                <div>
-                  <button className="px-3 py-1 bg-red-600 text-white rounded" onClick={()=>remove(c._id)}>Delete</button>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </>
       )}
@@ -144,59 +149,62 @@ export default function AdminCodes(){
       {tab === 'supplier' && (
         <div className="mt-6">
           <h2 className="text-xl mb-3">Supplier Codes</h2>
-          <div className="card mb-4">
-            <form onSubmit={createSupplier} className="grid grid-cols-3 gap-3 items-end">
-              <div>
+          <div className="card mb-4 p-4">
+            <form onSubmit={createSupplier} className="grid grid-cols-12 gap-3 items-end">
+              <div className="col-span-4">
                 <label className="block text-sm">Code</label>
-                <input value={supplierCode} onChange={e=>setSupplierCode(e.target.value)} />
+                <input className="w-full border p-2 rounded" value={supplierCode} onChange={e=>setSupplierCode(e.target.value)} placeholder="Supplier code" />
               </div>
-              <div>
+              <div className="col-span-8">
                 <label className="block text-sm">Label</label>
-                <input value={supplierLabel} onChange={e=>setSupplierLabel(e.target.value)} />
+                <input className="w-full border p-2 rounded" value={supplierLabel} onChange={e=>setSupplierLabel(e.target.value)} placeholder="Supplier name" />
               </div>
-              <div className="col-span-3 mt-2">
+              <div className="col-span-12 mt-2">
                 <button className="btn" type="submit">Create Supplier Code</button>
               </div>
             </form>
           </div>
 
-          <div className="card">
-            {codes.filter(c=>c.role==='supplier').map(c=> (
-              <div key={c._id} className="flex justify-between items-center py-2">
-                <div>
-                  {editingId === c._id ? (
-                    <div className="flex gap-2 items-center">
-                      <div>
-                        <input value={editLabel} onChange={e=>setEditLabel(e.target.value)} placeholder="Label" />
+          <div className="card p-4">
+            <div className="space-y-2">
+              {codes.filter(c=>c.role==='supplier').map(c=> (
+                <div key={c._id} className="flex justify-between items-center py-2 border-b last:border-b-0">
+                  <div>
+                    {editingId === c._id ? (
+                      <div className="flex gap-2 items-center">
+                        <div>
+                          <input className="border p-2 rounded" value={editLabel} onChange={e=>setEditLabel(e.target.value)} placeholder="Label" />
+                        </div>
+                        <div className="text-sm">
+                          <label className="inline-flex items-center gap-2">
+                            <input type="checkbox" checked={editActive} onChange={e=>setEditActive(e.target.checked)} /> Active
+                          </label>
+                        </div>
                       </div>
-                      <div className="text-sm">
-                        <label className="inline-flex items-center gap-2">
-                          <input type="checkbox" checked={editActive} onChange={e=>setEditActive(e.target.checked)} /> Active
-                        </label>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="font-medium">{c.code} {c.label ? `— ${c.label}` : ''}</div>
-                      <div className="text-sm text-gray-600">Active: {c.isActive ? 'yes' : 'no'} • UsedBy: {c.usedBy ? 'assigned' : 'free'}</div>
-                    </>
-                  )}
+                    ) : (
+                      <>
+                        <div className="font-medium">{c.code} {c.label ? `— ${c.label}` : ''}</div>
+                        <div className="text-sm text-gray-600">Active: {c.isActive ? 'yes' : 'no'}</div>
+                        <div className="text-sm text-gray-600">Assigned: {c.usedBy ? (typeof c.usedBy === 'string' ? c.usedBy : (c.usedBy.name || c.usedBy.email || c.usedBy.username || 'assigned')) : 'free'}</div>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    {editingId === c._id ? (
+                      <>
+                        <button className="px-3 py-1 bg-green-600 text-white rounded" onClick={saveEdit}>Save</button>
+                        <button className="px-3 py-1 bg-gray-300 rounded" onClick={cancelEdit}>Cancel</button>
+                      </>
+                    ) : (
+                      <>
+                        <button className="px-3 py-1 bg-blue-600 text-white rounded" onClick={()=>startEdit(c)}>Edit</button>
+                        <button className="px-3 py-1 bg-red-600 text-white rounded" onClick={()=>remove(c._id)}>Delete</button>
+                      </>
+                    )}
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  {editingId === c._id ? (
-                    <>
-                      <button className="px-3 py-1 bg-green-600 text-white rounded" onClick={saveEdit}>Save</button>
-                      <button className="px-3 py-1 bg-gray-300 rounded" onClick={cancelEdit}>Cancel</button>
-                    </>
-                  ) : (
-                    <>
-                      <button className="px-3 py-1 bg-blue-600 text-white rounded" onClick={()=>startEdit(c)}>Edit</button>
-                      <button className="px-3 py-1 bg-red-600 text-white rounded" onClick={()=>remove(c._id)}>Delete</button>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       )}

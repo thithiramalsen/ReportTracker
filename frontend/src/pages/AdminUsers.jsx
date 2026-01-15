@@ -15,9 +15,7 @@ export default function AdminUsers() {
   const toast = useToast()
   const [pendingDelete, setPendingDelete] = useState(null)
   const [pendingDeny, setPendingDeny] = useState(null)
-  const [pendingReset, setPendingReset] = useState(null)
-  const [resetPassword, setResetPassword] = useState('')
-  const [showResetPassword, setShowResetPassword] = useState(false)
+  
 
   useEffect(()=>{ load() }, [])
 
@@ -76,7 +74,7 @@ export default function AdminUsers() {
             <div className="flex gap-2">
               {!u.isApproved && <button className="px-3 py-1 bg-green-600 text-white rounded" onClick={()=>approve(u._id)}>Approve</button>}
               {!u.isApproved && <button className="px-3 py-1 bg-gray-300 text-gray-800 rounded" onClick={()=>deny(u._id)}>Deny</button>}
-              <button className="px-3 py-1 bg-indigo-600 text-white rounded" onClick={()=>{ setPendingReset(u); setResetPassword('') }}>Reset Password</button>
+              
               <button className="px-3 py-1 bg-red-600 text-white rounded" onClick={()=>remove(u._id)}>Delete</button>
             </div>
           </div>
@@ -85,25 +83,7 @@ export default function AdminUsers() {
       <Confirm open={!!pendingDelete} title="Delete user?" onCancel={()=>setPendingDelete(null)} onConfirm={()=>doConfirmDelete(pendingDelete)} />
       <Confirm open={!!pendingDeny} title="Deny and remove this user?" onCancel={()=>setPendingDeny(null)} onConfirm={()=>doConfirmDeny(pendingDeny)} />
 
-      {pendingReset && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-          <div className="bg-white rounded shadow-lg p-4 w-full max-w-md">
-            <div className="text-lg font-semibold mb-2">Reset password</div>
-            <div className="text-sm text-gray-600 mb-3">{pendingReset.name} ({pendingReset.code})</div>
-            <label className="text-xs text-gray-500">New password</label>
-            <div className="mt-1 relative">
-              <input type={showResetPassword ? 'text' : 'password'} value={resetPassword} onChange={e=>setResetPassword(e.target.value)} className="w-full border p-2 rounded mb-4" placeholder="Enter new password" />
-              <button type="button" className="absolute right-3 top-3 text-gray-600" onClick={()=>setShowResetPassword(s=>!s)} aria-label="Toggle password visibility">
-                {showResetPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
-            <div className="flex justify-end gap-2">
-              <button className="px-3 py-1 border rounded" onClick={()=>{ setPendingReset(null); setResetPassword('') }}>Cancel</button>
-              <button className="px-3 py-1 bg-blue-600 text-white rounded" onClick={submitReset} disabled={!resetPassword}>Save</button>
-            </div>
-          </div>
-        </div>
-      )}
+      
     </div>
   )
 }

@@ -61,7 +61,7 @@ export default function SignupPage() {
           <label className="block text-sm">Division Code</label>
           <select value={code} onChange={e => setCode(e.target.value)} className="w-full border p-2 rounded mt-1">
             <option value="">Select code</option>
-            {codes.map(c => (
+            {codes.filter(c => c.role !== 'supplier').map(c => (
               <option key={c.code} value={c.code}>{c.code}{c.label ? ` — ${c.label}` : ''} ({c.role || 'user'})</option>
             ))}
           </select>
